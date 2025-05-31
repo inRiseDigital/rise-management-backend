@@ -155,11 +155,11 @@ class StaffSignUpView(APIView):
 class LoginView(APIView):
     permission_classes = [permissions.AllowAny]
     def post(self, request):
-        username = request.data.get('username')
+        username = request.data.get('email')
         password = request.data.get('password')
         
         try:
-            user = staff.objects.get(username=username, password=password)
+            user = staff.objects.get(email=username, password=password)
             # In production, you should use proper password hashing
             return Response({
                 'staff_id': user.staff_id,
