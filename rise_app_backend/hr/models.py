@@ -10,7 +10,6 @@ class staff(models.Model):
     staff_department = models.CharField(max_length=100)
     staff_position = models.CharField(max_length=100)
     staff_joining_date = models.DateField()
-    staff_salary = models.DecimalField(max_digits=10, decimal_places=2)
     username = models.CharField(null=True)
     password = models.CharField(null=True)
     

@@ -13,12 +13,11 @@ class StaffSerializer(serializers.ModelSerializer):
         fields = [
             "staff_id", "staff_name", "staff_email", "staff_phone",
             "staff_department", "staff_position", "staff_joining_date",
-            "staff_salary", "used_leaves", "available_leaves","username", "password",
+            "used_leaves", "available_leaves", "username", "password",
         ]
         extra_kwargs = {
             'password': {'write_only': True}
         }
-
 
     def get_used_leaves(self, obj):
         return obj.used_leaves
