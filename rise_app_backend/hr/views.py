@@ -1,7 +1,7 @@
 from django.shortcuts import render
 from rest_framework import viewsets
-from .models import staff, leave
-from .serializers import StaffSerializer, LeaveSerializer
+from .models import staff, leave, department, site, vehicles, responsible_person
+from .serializers import StaffSerializer, LeaveSerializer, DepartmentSerializer, SiteSerializer, VehiclesSerializer, ResponsiblePersonSerializer
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
@@ -173,3 +173,164 @@ class LoginView(APIView):
             return Response({
                 'error': 'Invalid credentials'
             }, status=status.HTTP_401_UNAUTHORIZED)
+
+
+# -- vehicle Views --
+class VehicleListCreateView(APIView):
+    # permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        staff_qs = vehicles.objects.all()
+        serializer = VehiclesSerializer(staff_qs, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        serializer = VehiclesSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class VehiclesDetailView(APIView):
+    # permission_classes = [permissions.IsAuthenticated]
+
+    def get_object(self, number_plate):
+        return get_object_or_404(vehicles, number_plate=number_plate)
+
+    def get(self, request, pk):
+        staff = self.get_object(pk)
+        serializer = VehiclesSerializer(staff)
+        return Response(serializer.data)
+
+    def put(self, request, staff_id):
+        staff = self.get_object(staff_id)
+        serializer = VehiclesSerializer(staff, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    def delete(self, request, pk):
+        staff = self.get_object(pk)
+        staff.delete()
+        return Response({'message': f"Staff {pk} deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
+    
+# -- Department Views --
+class DepartmentListCreateView(APIView):
+    # permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        department_qs = department.objects.all()
+        serializer = DepartmentSerializer(department_qs, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        serializer = DepartmentSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+class DepartmentDetailView(APIView):    
+    # permission_classes = [permissions.IsAuthenticated]
+
+    def get_object(self, dpt_id):
+        return get_object_or_404(department, dpt_id=dpt_id)
+
+    def get(self, request, pk):
+        department_obj = self.get_object(pk)
+        serializer = DepartmentSerializer(department_obj)
+        return Response(serializer.data)
+
+    def put(self, request, dpt_id):
+        department_obj = self.get_object(dpt_id)
+        serializer = DepartmentSerializer(department_obj, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk):
+        department_obj = self.get_object(pk)
+        department_obj.delete()
+        return Response({'message': f"Department {pk} deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
+    
+    
+# -- Location Views --
+class LocationListCreateView(APIView):
+    # permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        location_qs = site.objects.all()
+        serializer = SiteSerializer(location_qs, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        serializer = SiteSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+class LocationDetailView(APIView):
+    # permission_classes = [permissions.IsAuthenticated]
+
+    def get_object(self, location_id):
+        return get_object_or_404(site, location_id=location_id)
+
+    def get(self, request, pk):
+        location_obj = self.get_object(pk)
+        serializer = SiteSerializer(location_obj)
+        return Response(serializer.data)
+
+    def put(self, request, location_id):
+        location_obj = self.get_object(location_id)
+        serializer = SiteSerializer(location_obj, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk):
+        location_obj = self.get_object(pk)
+        location_obj.delete()
+        return Response({'message': f"Location {pk} deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
+    
+# -- Responsible Person Views --
+class ResponsiblePersonListCreateView(APIView):
+    # permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        responsible_person_qs = responsible_person.objects.all()
+        serializer = ResponsiblePersonSerializer(responsible_person_qs, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        serializer = ResponsiblePersonSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+class ResponsiblePersonDetailView(APIView):
+    # permission_classes = [permissions.IsAuthenticated]
+
+    def get_object(self, id):
+        return get_object_or_404(responsible_person, id=id)
+
+    def get(self, request, pk):
+        responsible_person_obj = self.get_object(pk)
+        serializer = ResponsiblePersonSerializer(responsible_person_obj)
+        return Response(serializer.data)
+
+    def put(self, request, id):
+        responsible_person_obj = self.get_object(id)
+        serializer = ResponsiblePersonSerializer(responsible_person_obj, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk):
+        responsible_person_obj = self.get_object(pk)
+        responsible_person_obj.delete()
+        return Response({'message': f"Responsible Person {pk} deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
