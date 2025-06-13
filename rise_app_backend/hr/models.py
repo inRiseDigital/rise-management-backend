@@ -95,7 +95,7 @@ class expense_category(models.Model):
 class expense_sub_category(models.Model):
     id = models.CharField(max_length=100, unique=True, primary_key=True)
     categiry_id = models.ForeignKey(expense_category, to_field='id', on_delete=models.CASCADE, related_name='sub_categories')
-    sub_category = models.CharField(max_length=100)
+    sub_category = models.CharField(max_length=100) 
     def __str__(self):
         return self.id
     
@@ -106,7 +106,7 @@ class expenses (models.Model):
     expense_sub_category = models.ForeignKey(expense_sub_category, to_field='id', on_delete=models.CASCADE, related_name='expenses')
     date = models.DateField()
     responsible_person = models.ForeignKey(responsible_person, on_delete=models.SET_NULL, null=True, related_name='expenses')
-    sub_category = models.CharField(max_length=100)
+    sub_category = models.CharField(max_length=100) 
     description = models.TextField()
     bill_no = models.CharField(max_length=100, unique=True)
     cost = models.DecimalField(max_digits=10, decimal_places=2)
@@ -120,8 +120,8 @@ class desal_purchase(models.Model):
     purchase_id = models.CharField(max_length=100, unique=True)
     purchase_date = models.DateField()
     responsible_person = models.ForeignKey(responsible_person, on_delete=models.SET_NULL, null=True, related_name='desal_purchases')
-    sub_category = models.CharField(max_digits=10, decimal_places=2)
-    description = models.CharField(max_digits=10, decimal_places=2)
+    sub_category = models.CharField(max_length=100) 
+    description = models.CharField()
     litters = models.DecimalField(max_digits=10, decimal_places=2)
     cost = models.DecimalField(max_digits=10, decimal_places=2)
     created_at = models.DateTimeField(auto_now_add=True)
