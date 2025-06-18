@@ -2,8 +2,8 @@ from django.db import models
 
 # Create your models here.
 
-class staff(models.Model):
-    staff_id = models.CharField(max_length=100, unique=True)
+class Staff(models.Model):
+    staff_id = models.CharField(max_length=100, unique=True, primary_key=True)
     staff_name = models.CharField(max_length=100)
     staff_email = models.EmailField(unique=True)
     staff_phone = models.CharField(max_length=15)
@@ -39,7 +39,7 @@ class leave(models.Model):
     leave_end_date = models.DateField()
     leave_reason = models.TextField()
     leave_status = models.CharField(max_length=50, default='Pending')
-    staff = models.ForeignKey(staff,to_field='staff_id',on_delete=models.CASCADE, related_name='leaves'      
+    staff = models.ForeignKey(Staff,to_field='staff_id',on_delete=models.CASCADE, related_name='leaves'      
     )
 
     def __str__(self):
@@ -47,19 +47,19 @@ class leave(models.Model):
     
 ###########################
 class responsible_person(models.Model):
-    id = models.CharField(max_length=100, unique=True)
-    staff_id = models.ForeignKey(staff, to_field='staff_id', on_delete=models.CASCADE, related_name='responsible_persons')
+    id = models.CharField(max_length=100, unique=True, primary_key=True)
+    staff_id = models.ForeignKey(Staff, to_field='staff_id', on_delete=models.CASCADE, related_name='responsible_persons')
     person_name = models.CharField(max_length=100)
     responsibl_section = models.CharField(max_length=100)
     def __str__(self):
         return self.person_name
     
 class department(models.Model):
-    dpt_id = models.CharField(max_length=100, unique=True)
+    dpt_id = models.CharField(max_length=100, unique=True, primary_key=True)
     dpt_name = models.CharField(max_length=100, unique=True)
-    dpt_description = models.ForeignKey(staff, to_field='staff_id', on_delete=models.SET_NULL, null=True, related_name='department_head')
+    dpt_description = models.ForeignKey(Staff, to_field='staff_id', on_delete=models.SET_NULL, null=True, related_name='department_head')
     created_at = models.DateTimeField(auto_now_add=True)
-    responsible_person = models.ForeignKey(staff, to_field='staff_id', on_delete=models.SET_NULL, null=True, related_name='responsible_department')
+    responsible_person = models.ForeignKey(Staff, to_field='staff_id', on_delete=models.SET_NULL, null=True, related_name='responsible_department')
 
     def __str__(self):
         return self.dpt_id
@@ -87,7 +87,7 @@ class vehicles(models.Model):
 #Income and Expenses
 
 class expense_category(models.Model):
-    id = models.CharField(max_length=100, unique=True)
+    id = models.CharField(max_length=100, unique=True,primary_key=True)
     projet_department = models.CharField(max_length=100)
 
     def __str__(self):
@@ -101,7 +101,7 @@ class expense_sub_category(models.Model):
     
 
 class expenses (models.Model):
-    id = models.CharField(max_length=100, unique=True)
+    id = models.CharField(max_length=100, unique=True, primary_key=True)
     expense_category = models.ForeignKey(expense_category, to_field='id', on_delete=models.CASCADE, related_name='expenses')
     expense_sub_category = models.ForeignKey(expense_sub_category, to_field='id', on_delete=models.CASCADE, related_name='expenses')
     date = models.DateField()
@@ -117,7 +117,7 @@ class expenses (models.Model):
     
 #Desal perchesing and usage
 class desal_purchase(models.Model):
-    purchase_id = models.CharField(max_length=100, unique=True)
+    purchase_id = models.CharField(max_length=100, unique=True, primary_key=True)
     purchase_date = models.DateField()
     responsible_person = models.ForeignKey(responsible_person, on_delete=models.SET_NULL, null=True, related_name='desal_purchases')
     sub_category = models.CharField(max_length=100) 

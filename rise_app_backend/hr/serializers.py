@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import staff, leave, department, site, vehicles, expense_category, expenses,desal_purchase, responsible_person,expense_sub_category
+from .models import Staff, leave, department, site, vehicles, expense_category, expenses,desal_purchase, responsible_person,expense_sub_category
 from django.contrib.auth.hashers import make_password
 
 
@@ -8,11 +8,10 @@ class StaffSerializer(serializers.ModelSerializer):
     available_leaves = serializers.SerializerMethodField()
 
     class Meta:
-        model = staff
-        # include all your staff fields plus the two counters
+        model = Staff
         fields = [
             "staff_id", "staff_name", "staff_email", "staff_phone",
-            "staff_department", "staff_position", "staff_joining_date",
+            "staff_department", "roll", "staff_joining_date",
             "used_leaves", "available_leaves", "username", "password",
         ]
         extra_kwargs = {

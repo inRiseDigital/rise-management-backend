@@ -1,6 +1,6 @@
 from django.shortcuts import render
 from rest_framework import viewsets
-from .models import staff, leave, department, site, vehicles, responsible_person
+from .models import Staff, leave, department, site, vehicles, responsible_person
 from .serializers import StaffSerializer, LeaveSerializer, DepartmentSerializer, SiteSerializer, VehiclesSerializer, ResponsiblePersonSerializer
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -17,7 +17,7 @@ class StaffListCreateView(APIView):
     # permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        staff_qs = staff.objects.all()
+        staff_qs = Staff.objects.all()
         serializer = StaffSerializer(staff_qs, many=True)
         return Response(serializer.data)
 
@@ -32,7 +32,7 @@ class StaffDetailView(APIView):
     # permission_classes = [permissions.IsAuthenticated]
 
     def get_object(self, staff_id):
-        return get_object_or_404(staff, staff_id=staff_id)
+        return get_object_or_404(Staff, staff_id=staff_id)
 
     def get(self, request, pk):
         staff = self.get_object(pk)
@@ -159,17 +159,16 @@ class LoginView(APIView):
         password = request.data.get('password')
         
         try:
-            user = staff.objects.get(email=username, password=password)
+            user = Staff.objects.get(email=username, password=password)
             # In production, you should use proper password hashing
-            return Response({
-                'staff_id': user.staff_id,
+            return Response({                'staff_id': user.staff_id,
                 'username': user.username,
                 'name': user.staff_name,
-                'role': user.staff_position,
+                'role': user.roll,
                 'department': user.staff_department,
                 'message': 'Login successful'
             }, status=status.HTTP_200_OK)
-        except staff.DoesNotExist:
+        except Staff.DoesNotExist:
             return Response({
                 'error': 'Invalid credentials'
             }, status=status.HTTP_401_UNAUTHORIZED)
