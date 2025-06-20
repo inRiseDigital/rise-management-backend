@@ -24,4 +24,5 @@ urlpatterns = [
     path('cattle_hut/', include('cattle_hut.urls')),
     path('mep/', include('mep.urls')),
     path('housekeeping/', include('house_keeping.urls')),
+    path('kitchen/', include('kitchen.urls')),
 ]
