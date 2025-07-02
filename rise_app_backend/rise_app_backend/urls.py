@@ -25,4 +25,7 @@ urlpatterns = [
     path('mep/', include('mep.urls')),
     path('housekeeping/', include('house_keeping.urls')),
     path('kitchen/', include('kitchen.urls')),
+    path('vehicle/', include('vehicle_bookig.urls')),
+    path('repair_expenses/', include('repair_expenses.urls')),
+    path('labour_allocation/', include('labour_allocation.urls')),
 ]

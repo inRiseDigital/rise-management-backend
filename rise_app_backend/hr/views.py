@@ -1,11 +1,11 @@
 from django.shortcuts import render
 from rest_framework import viewsets
-from .models import Staff, leave, department, site, vehicles, responsible_person
-from .serializers import StaffSerializer, LeaveSerializer, DepartmentSerializer, SiteSerializer, VehiclesSerializer, ResponsiblePersonSerializer
+from .models import Staff, leave, Department, site, vehicles , Labour, Allocation
+from .serializers import StaffSerializer, LeaveSerializer, DepartmentSerializer, SiteSerializer, VehiclesSerializer , LabourSerializer,AllocationSerializer
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
-from rest_framework import status
+from rest_framework import status,generics
 from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 from rest_framework import permissions
@@ -51,8 +51,77 @@ class StaffDetailView(APIView):
         staff = self.get_object(pk)
         staff.delete()
         return Response({'message': f"Staff {pk} deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
+    
+# labour views
+class LabourListCreateView(APIView):
+    permission_classes = [AllowAny]  # Allow any user to access this view]
+
+    def get(self, request):
+        staff_qs = Labour.objects.all()
+        serializer = LabourSerializer(staff_qs, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        serializer = LabourSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class LabourDetailView(APIView):
+    permission_classes = [AllowAny]
+
+    def get_object(self, Labour_id):
+        return get_object_or_404(Labour, Labour_id=Labour_id)
+
+    def get(self, request, pk):
+        staff = self.get_object(pk)
+        serializer = LabourSerializer(staff)
+        return Response(serializer.data)
+
+    def put(self, request, staff_id):
+        staff = self.get_object(staff_id)
+        serializer = LabourSerializer(staff, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk):
+        staff = self.get_object(pk)
+        staff.delete()
+        return Response({'message': f"Staff {pk} deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
+    #---------
 
 
+#------------------
+
+#labour task assignment
+class AllocationCreateView(generics.CreateAPIView):
+    permission_classes = [AllowAny]
+    """
+    POST /api/allocations/  
+    Create or update a daily allocation of labours to a task.
+    Payload:
+    {
+      "task": "T1",
+      "date": "2025-06-30",
+      "labours": ["L1","L2","L3"],
+      "meal_cost_per_labour": 10.50
+    }
+    Response includes computed fields:
+    {
+      "task": "T1",
+      "date": "2025-06-30",
+      "man_days": 3,
+      "wages_total": "450.00",
+      "meals_total": "31.50",
+      "total_amount": "481.50"
+    }
+    """
+    queryset = Allocation.objects.all()
+    serializer_class = AllocationSerializer
+#--------------
 class LeaveListView(APIView):
     # permission_classes = [permissions.IsAuthenticated]
 
@@ -216,10 +285,10 @@ class VehiclesDetailView(APIView):
     
 # -- Department Views --
 class DepartmentListCreateView(APIView):
-    # permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get(self, request):
-        department_qs = department.objects.all()
+        department_qs = Department.objects.all()
         serializer = DepartmentSerializer(department_qs, many=True)
         return Response(serializer.data)
 
@@ -234,7 +303,7 @@ class DepartmentDetailView(APIView):
     # permission_classes = [permissions.IsAuthenticated]
 
     def get_object(self, dpt_id):
-        return get_object_or_404(department, dpt_id=dpt_id)
+        return get_object_or_404(Department, dpt_id=dpt_id)
 
     def get(self, request, pk):
         department_obj = self.get_object(pk)
@@ -294,42 +363,83 @@ class LocationDetailView(APIView):
         location_obj.delete()
         return Response({'message': f"Location {pk} deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
     
-# -- Responsible Person Views --
-class ResponsiblePersonListCreateView(APIView):
-    # permission_classes = [permissions.IsAuthenticated]
+# labour allowcation CRUD
+class AllocationListCreateView(APIView):
+    permission_classes = [AllowAny]
+    # permission_classes = [permissions.IsAuthenticated]  
 
     def get(self, request):
-        responsible_person_qs = responsible_person.objects.all()
-        serializer = ResponsiblePersonSerializer(responsible_person_qs, many=True)
+        allocations = Allocation.objects.all().order_by('-date')
+        serializer = AllocationSerializer(allocations, many=True)
         return Response(serializer.data)
 
     def post(self, request):
-        serializer = ResponsiblePersonSerializer(data=request.data)
+        serializer = AllocationSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            allocation = serializer.save()
+            return Response(
+                AllocationSerializer(allocation).data,
+                status=status.HTTP_201_CREATED
+            )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-class ResponsiblePersonDetailView(APIView):
-    # permission_classes = [permissions.IsAuthenticated]
 
-    def get_object(self, id):
-        return get_object_or_404(responsible_person, id=id)
+
+class AllocationDetailView(APIView):
+    permission_classes = [AllowAny]
+    # permission_classes = [permissions.IsAuthenticated]  
+
+    def get_object(self, pk):
+        return get_object_or_404(Allocation, pk=pk)
 
     def get(self, request, pk):
-        responsible_person_obj = self.get_object(pk)
-        serializer = ResponsiblePersonSerializer(responsible_person_obj)
+        allocation = self.get_object(pk)
+        serializer = AllocationSerializer(allocation)
         return Response(serializer.data)
 
-    def put(self, request, id):
-        responsible_person_obj = self.get_object(id)
-        serializer = ResponsiblePersonSerializer(responsible_person_obj, data=request.data)
+    def put(self, request, pk):
+        allocation = self.get_object(pk)
+        serializer = AllocationSerializer(allocation, data=request.data)
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
+            allocation = serializer.save()
+            return Response(AllocationSerializer(allocation).data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def patch(self, request, pk):
+        allocation = self.get_object(pk)
+        serializer = AllocationSerializer(
+            allocation, data=request.data, partial=True
+        )
+        if serializer.is_valid():
+            allocation = serializer.save()
+            return Response(AllocationSerializer(allocation).data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, pk):
-        responsible_person_obj = self.get_object(pk)
-        responsible_person_obj.delete()
-        return Response({'message': f"Responsible Person {pk} deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
+        allocation = self.get_object(pk)
+        allocation.delete()
+        return Response(
+            {'message': f'Allocation {pk} deleted.'},
+            status=status.HTTP_204_NO_CONTENT
+        )
+        
+class AllocationDoneWorkUpdateView(APIView):
+    
+
+    def patch(self, request, pk):
+        allocation = get_object_or_404(Allocation, pk=pk)
+
+        # Expect a single field in the payload
+        new_progress = request.data.get('done_work')
+        if new_progress is None:
+            return Response(
+                {"error": "done_work is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Update and save
+        allocation.done_work = new_progress
+        allocation.save(update_fields=['done_work'])
+
+        # Return the full serialized object
+        serializer = AllocationSerializer(allocation)
+        return Response(serializer.data)

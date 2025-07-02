@@ -89,7 +89,7 @@ class TaskDetailView(APIView):
         task = self.get_object(pk)
         task.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-
+'''
 # --- ManPower Views ---
 #class ManPowerListCreateView(APIView):
     permission_classes = [AllowAny] 
@@ -127,7 +127,7 @@ class TaskDetailView(APIView):
         manpower = self.get_object(pk)
         manpower.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-
+'''
 #retrieve onging tasks for a project
 class OngoingTasksView(APIView):
     permission_classes = [AllowAny] 

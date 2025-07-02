@@ -1,34 +1,72 @@
-# views.py
-
-from rest_framework import generics, status
+from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework import status
+from django.shortcuts import get_object_or_404
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from .models import Vehicle, Booking
-from .serializers import VehicleSerializer, BookingSerializer
+from .serializers import VehicleSerializer,BookingSerializer
+from django.core.exceptions import ValidationError
 
+from django.http import HttpResponse
+from textwrap import wrap
 
-class VehicleList(generics.ListAPIView):
-    queryset = Vehicle.objects.all()
-    serializer_class = VehicleSerializer
+# --- Vehicle Views ---
+class VehicleListCreateView(APIView):
+    permission_classes = [AllowAny] 
+    def get(self, request):
+        vehicles = Vehicle.objects.all()
+        serializer = VehicleSerializer(vehicles, many=True)
+        return Response(serializer.data)
 
+    def post(self, request):
+        serializer = VehicleSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-class VehicleAvailability(generics.GenericAPIView):
-    serializer_class = BookingSerializer
+class VehicleDetailView(APIView):
+    permission_classes = [AllowAny] 
+    def get_object(self, pk):
+        return get_object_or_404(Vehicle, pk=pk)
 
-    def get(self, request, vehicle_id):
+    def get(self, request, pk):
+        vehicle = self.get_object(pk)
+        serializer = VehicleSerializer(vehicle)
+        return Response(serializer.data)
+
+    def put(self, request, pk):
+        vehicle = self.get_object(pk)
+        serializer = VehicleSerializer(vehicle, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk):
+        vehicle = self.get_object(pk)
+        vehicle.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+    
+class VehicleBookingsView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, pk):
         """
-        Returns all free-time intervals for the next 7 days, or
-        simply returns existing bookings so the client can invert.
+        List all existing bookings for vehicle=pk
         """
-        # Here we return existing bookings; client can calculate free slots
-        bookings = Booking.objects.filter(vehicle_id=vehicle_id).order_by("start_time")
-        serializer = BookingSerializer(bookings, many=True)
+        vehicle = get_object_or_404(Vehicle, pk=pk)
+        qs = vehicle.bookings.order_by('start_time')
+        serializer = BookingSerializer(qs, many=True)
         return Response(serializer.data)
 
 
-class BookingCreate(generics.CreateAPIView):
-    queryset = Booking.objects.all()
-    serializer_class = BookingSerializer
+class BookingCreateView(APIView):
+    permission_classes = [AllowAny]
 
-    def create(self, request, *args, **kwargs):
-        # Let save() + clean() enforce no-overlap
-        return super().create(request, *args, **kwargs)
+    def post(self, request):
+        serializer = BookingSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

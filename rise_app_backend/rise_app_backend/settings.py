@@ -46,6 +46,8 @@ INSTALLED_APPS = [
     'house_keeping',
     'kitchen',
     'vehicle_bookig', 
+    'repair_expenses',
+    'labour_allocation',
 ]
 
 MIDDLEWARE = [

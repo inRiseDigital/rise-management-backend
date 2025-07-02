@@ -1,6 +1,6 @@
 from django.apps import AppConfig
 
 
-class HousekeepingConfig(AppConfig):
+class LabourAllocationConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
-    name = 'housekeeping'
+    name = 'labour_allocation'
