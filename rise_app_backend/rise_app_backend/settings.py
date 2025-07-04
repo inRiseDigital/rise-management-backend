@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'vehicle_bookig', 
     'repair_expenses',
     'labour_allocation',
+    'stores',
 ]
 
 MIDDLEWARE = [
