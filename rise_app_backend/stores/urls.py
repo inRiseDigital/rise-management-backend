@@ -26,8 +26,8 @@ urlpatterns = [
     path("inventory/<int:pk>/",   InventoryItemDetail.as_view(),     name="inv-detail"),
 
     # Stock operations
-    path("inventory/<int:pk>/receive/", InventoryReceive.as_view(),  name="inv-receive"),
-    path("inventory/<int:pk>/issue/",   InventoryIssue.as_view(),    name="inv-issue"),
+    path("inventory/receive/<int:pk>/", InventoryReceive.as_view(),  name="inv-receive"),
+    path("inventory/issue/<int:pk>/",   InventoryIssue.as_view(),    name="inv-issue"),
 
     # Filtering
     path("inventory/filter/",     InventoryFilterView.as_view(), name="inv-filter"),
