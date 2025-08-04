@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'repair_expenses',
     'labour_allocation',
     'stores',
+    'oil_extraction',
 ]
 
 MIDDLEWARE = [

@@ -4,7 +4,9 @@ from .views import (
     MilkCollectionDetailView,
     CostEntryListCreateView,
     CostEntryDetailView,
-    MilkCollectionPDFExportView
+    MilkCollectionPDFExportView,
+    LatestMilkCollectionView,
+    MonthToDateIncomeView
 )
 
 urlpatterns = [
@@ -18,4 +20,6 @@ urlpatterns = [
     
     # PDF Export for Milk Collection
     path('milk/pdf-export/', MilkCollectionPDFExportView.as_view(), name='milk_pdf_export'),
+    path("milk_collection/latest/", LatestMilkCollectionView.as_view(), name="latest-milk-collection"),
+    path("milk_collection/month_to_date_income/", MonthToDateIncomeView.as_view(), name="month-to-date-income"), #GET /api/milk_collection/month_to_date_income/--- OR---- GET /api/milk_collection/month_to_date_income/?date=2025-03-10
 ]

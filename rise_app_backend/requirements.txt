@@ -1,0 +1,6 @@
+langgraph>=0.2.0
+openai
+django>=4.0
+python-dotenv
+fastmcp
+aiohttp

@@ -29,4 +29,5 @@ urlpatterns = [
     path('repair_expenses/', include('repair_expenses.urls')),
     path('labour_allocation/', include('labour_allocation.urls')),
     path('stores/', include('stores.urls')),
+    path('oil/', include('oil_extraction.urls')),
 ]

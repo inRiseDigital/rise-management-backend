@@ -143,10 +143,23 @@ class ProductSubCategoryByCategory(APIView):
 class InventoryItemListCreate(APIView):
     permission_classes = [AllowAny]
     def get(self, request):
+
+        """
+        GET /stores/inventory/
+        Returns all inventory items in the system, selecting related store, category, and subcategory.
+        """ 
+
         qs = InventoryItem.objects.select_related("store","category","subcategory").all()
         return Response(InventoryItemSerializer(qs, many=True).data)
 
     def post(self, request):
+        """
+        POST /stores/inventory/
+        Create a new inventory item.
+        Data must contain keys for 'store', 'category', 'subcategory', 'units_in_stock', and 'unit_cost'.
+        Returns the newly created inventory item data. 
+        """
+
         ser = InventoryItemSerializer(data=request.data)
         if ser.is_valid():
             ser.save()
@@ -174,33 +187,41 @@ class InventoryItemDetail(APIView):
 
 
 # ── Stock Operations ───────────────────────────────────────
-
 class InventoryReceive(APIView):
     permission_classes = [AllowAny]
+
     def post(self, request, pk):
-        item  = get_object_or_404(InventoryItem, pk=pk)
+        item = get_object_or_404(InventoryItem, pk=pk)
         units = request.data.get("units")
         cost  = request.data.get("cost_per_unit")
+
         if units is None or cost is None:
             return Response(
-                {"error":"Both 'units' and 'cost_per_unit' are required"},
+                {"error": "Both 'units' and 'cost_per_unit' are required"},
                 status=400
             )
-        item.receive(float(units), float(cost))
+
+        # This will update item.units_in_stock and item.unit_cost
+        item.receive(units, cost)
         return Response(InventoryItemSerializer(item).data)
 
 
 class InventoryIssue(APIView):
     permission_classes = [AllowAny]
+
     def post(self, request, pk):
-        item  = get_object_or_404(InventoryItem, pk=pk)
+        item = get_object_or_404(InventoryItem, pk=pk)
         units = request.data.get("units")
+
         if units is None:
-            return Response({"error":"'units' is required"}, status=400)
+            return Response({"error": "'units' is required"}, status=400)
+
         try:
-            item.issue(float(units))
-        except ValidationError as e:
-            return Response({"error":str(e)}, status=400)
+            # This will decrease item.units_in_stock
+            item.issue(units)
+        except ValidationError as exc:
+            return Response({"error": str(exc)}, status=400)
+
         return Response(InventoryItemSerializer(item).data)
 
 
@@ -232,4 +253,4 @@ class InventoryFilterView(APIView):
         data = InventoryItemSerializer(qs, many=True).data
         return Response({"store":store.name, "items":data})
 
-# get subcategory by category id. 
+

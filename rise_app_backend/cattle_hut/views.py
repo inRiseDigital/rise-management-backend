@@ -15,6 +15,8 @@ from reportlab.lib import colors
 from reportlab.platypus import Table, TableStyle
 from django.utils.dateparse import parse_date
 from rest_framework import status
+from datetime import date
+from django.db.models import Sum
 
 # List & Create
 class MilkCollectionListCreateView(APIView):
@@ -220,3 +222,52 @@ class MilkCollectionPDFExportView(APIView):
         pdf.showPage()
         pdf.save()
         return response
+    
+class LatestMilkCollectionView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, *args, **kwargs):
+        latest = MilkCollection.objects.order_by('-date').first()
+        if latest is None:
+            return Response({"detail": "No milk collection found"}, status=404)
+        serializer = MilkCollectionSerializer(latest)
+        return Response(serializer.data)
+    
+class MonthToDateIncomeView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, *args, **kwargs):
+        # optional override of "today" for testing
+        ds = request.query_params.get("date")  # format: YYYY-MM-DD
+        if ds:
+            try:
+                ref = date.fromisoformat(ds)
+            except ValueError:
+                return Response({"detail": "Invalid date format; use YYYY-MM-DD"}, status=400)
+        else:
+            ref = date.today()
+
+        # period start = first day of current month; end = ref
+        start_date = date(ref.year, ref.month, 1)
+        end_date = ref
+
+        # aggregate income and optionally sums of quantities
+        agg = MilkCollection.objects.filter(date__range=(start_date, end_date)).aggregate(
+            total_income=Sum("day_total_income"),
+            total_kg=Sum("total_kg"),
+            total_liters=Sum("total_liters"),
+        )
+
+        # fallback to 0 if None
+        total_income = agg["total_income"] or 0.0
+        total_kg = agg["total_kg"] or 0.0
+        total_liters = agg["total_liters"] or 0.0
+
+        return Response({
+            "reference_date": ref.isoformat(),
+            "period_start": start_date.isoformat(),
+            "period_end": end_date.isoformat(),
+            "total_income": total_income,
+            "total_kg": total_kg,
+            "total_liters": total_liters,
+        })
