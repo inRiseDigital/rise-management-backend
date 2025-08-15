@@ -3,7 +3,7 @@ import asyncio
 import os
 import logging
 from dotenv import load_dotenv
-from fastmcp import FastMCP, tools
+from mcp.server.fastmcp import FastMCP
 from fastmcp.tools import tool
 
 load_dotenv()
@@ -81,7 +81,7 @@ async def request_json(method: str, url: str, **kwargs) -> dict:
 
 # === Stores ===
 
-@app.tool
+@app.tool()
 async def get_stores() -> dict:
     """Retrieve all stores list of from the Django backend API.
 
@@ -95,7 +95,7 @@ async def get_stores() -> dict:
     return {"stores": result["data"]}
 
 
-@app.tool
+@app.tool()
 async def add_store() -> dict:
     """Create a new store entry and return the resulting stores payload.
 
@@ -121,7 +121,7 @@ async def add_store() -> dict:
     return {"store": result["data"]}
 
 
-@app.tool
+@app.tool()
 async def get_store_by_id(store_id: int) -> dict:
     """
     Fetch a specific store by its ID.
@@ -136,7 +136,7 @@ async def get_store_by_id(store_id: int) -> dict:
     Returns:
         dict: The store data.
     """
-    result = await request_json("GET", f"{BASE_URL}/stores/add_stores/{store_id}/")
+    result = await request_json("GET", f"{BASE_URL}/stores/stores/{store_id}/")
     if "error" in result:
         if result.get("status") == 404:
             return {"error": "Store not found", "status": 404}
@@ -144,7 +144,7 @@ async def get_store_by_id(store_id: int) -> dict:
     return {"store": result["data"]}
 
 
-@app.tool
+@app.tool()
 async def update_store_by_id(store_id: int, data: dict) -> dict:
     """
     Update a specific store by its ID.
@@ -167,7 +167,7 @@ async def update_store_by_id(store_id: int, data: dict) -> dict:
     return {"store": result["data"]}
 
 
-@app.tool
+@app.tool()
 async def delete_store_by_id(store_id: int) -> dict:
     """
     Delete a specific store by its ID.
@@ -192,7 +192,7 @@ async def delete_store_by_id(store_id: int) -> dict:
 
 # === Product Categories ===
 
-@app.tool
+@app.tool()
 async def add_product_category(data: dict) -> dict:
     """
     Ceare a new product category.
@@ -215,7 +215,7 @@ async def add_product_category(data: dict) -> dict:
     return {"product_category": result["data"]}
 
 
-@app.tool
+@app.tool()
 async def get_product_categories() -> dict:
     """
     Fetch a all categories.
@@ -234,7 +234,7 @@ async def get_product_categories() -> dict:
     return {"product_categories": result["data"]}
 
 
-@app.tool
+@app.tool()
 async def get_product_category_by_id(category_id: int) -> dict:
     
     """
@@ -259,7 +259,7 @@ async def get_product_category_by_id(category_id: int) -> dict:
     return {"product_category": result["data"]}
 
 
-@app.tool
+@app.tool()
 async def update_product_category_by_id(category_id: int, data: dict) -> dict:
     """
     Update a specific category by its ID.
@@ -282,7 +282,7 @@ async def update_product_category_by_id(category_id: int, data: dict) -> dict:
     return {"product_category": result["data"]}
 
 
-@app.tool
+@app.tool()
 async def delete_product_category_by_id(category_id: int) -> dict:
     """Delete a specific product category by its ID."""
     result = await request_json("DELETE", f"{BASE_URL}/stores/categories/{category_id}/")
@@ -295,7 +295,7 @@ async def delete_product_category_by_id(category_id: int) -> dict:
 
 # === Product Subcategories ===
 
-@app.tool
+@app.tool()
 async def get_product_subcategories() -> dict:
     """Retrieve all product subcategories."""
     result = await request_json("GET", f"{BASE_URL}/stores/subcategories/")
@@ -304,7 +304,7 @@ async def get_product_subcategories() -> dict:
     return {"product_subcategories": result["data"]}
 
 
-@app.tool
+@app.tool()
 async def create_product_subcategory(data: dict) -> dict:
     """Create a new product subcategory."""
     result = await request_json("POST", f"{BASE_URL}/stores/subcategories/", json=data)
@@ -313,7 +313,7 @@ async def create_product_subcategory(data: dict) -> dict:
     return {"product_subcategory": result["data"]}
 
 
-@app.tool
+@app.tool()
 async def get_product_subcategory_by_id(subcategory_id: int) -> dict:
     """Retrieve a specific product subcategory by its ID."""
     result = await request_json("GET", f"{BASE_URL}/stores/subcategories/{subcategory_id}/")
@@ -324,7 +324,7 @@ async def get_product_subcategory_by_id(subcategory_id: int) -> dict:
     return {"product_subcategory": result["data"]}
 
 
-@app.tool
+@app.tool()
 async def update_product_subcategory_by_id(subcategory_id: int, data: dict) -> dict:
     """Update a specific product subcategory by its ID."""
     result = await request_json("PUT", f"{BASE_URL}/stores/subcategories/{subcategory_id}/", json=data)
@@ -333,7 +333,7 @@ async def update_product_subcategory_by_id(subcategory_id: int, data: dict) -> d
     return {"product_subcategory": result["data"]}
 
 
-@app.tool
+@app.tool()
 async def delete_product_subcategory_by_id(subcategory_id: int) -> dict:
     """Delete a specific product subcategory by its ID."""
     result = await request_json("DELETE", f"{BASE_URL}/stores/subcategories/{subcategory_id}/")
@@ -344,7 +344,7 @@ async def delete_product_subcategory_by_id(subcategory_id: int) -> dict:
     return {"message": "Subcategory deleted successfully"}
 
 
-@app.tool
+@app.tool()
 async def get_product_subcategories_by_category_id(category_id: int) -> dict:
     """Retrieve all product subcategories for a specific category."""
     result = await request_json("GET", f"{BASE_URL}/stores/subcategories/category/{category_id}/")
@@ -355,7 +355,7 @@ async def get_product_subcategories_by_category_id(category_id: int) -> dict:
 
 # === Inventory ===
 
-@app.tool
+@app.tool()
 async def get_inventory_items() -> dict:
     """Retrieve all inventory items."""
     result = await request_json("GET", f"{BASE_URL}/stores/inventory/")
@@ -364,7 +364,7 @@ async def get_inventory_items() -> dict:
     return {"inventory_items": result["data"]}
 
 
-@app.tool
+@app.tool()
 async def create_inventory_item(data: dict) -> dict:
     """Create a new inventory item."""
     result = await request_json("POST", f"{BASE_URL}/stores/inventory/", json=data)
@@ -373,7 +373,7 @@ async def create_inventory_item(data: dict) -> dict:
     return {"inventory_item": result["data"]}
 
 
-@app.tool
+@app.tool()
 async def get_inventory_item_by_id(item_id: int) -> dict:
     """Retrieve a specific inventory item by its ID."""
     result = await request_json("GET", f"{BASE_URL}/stores/inventory/{item_id}/")
@@ -384,7 +384,7 @@ async def get_inventory_item_by_id(item_id: int) -> dict:
     return {"inventory_item": result["data"]}
 
 
-@app.tool
+@app.tool()
 async def update_inventory_item_by_id(item_id: int, data: dict) -> dict:
     """Update a specific inventory item."""
     result = await request_json("PUT", f"{BASE_URL}/stores/inventory/{item_id}/", json=data)
@@ -393,7 +393,7 @@ async def update_inventory_item_by_id(item_id: int, data: dict) -> dict:
     return {"inventory_item": result["data"]}
 
 
-@app.tool
+@app.tool()
 async def delete_inventory_item_by_id(item_id: int) -> dict:
     """Delete a specific inventory item."""
     result = await request_json("DELETE", f"{BASE_URL}/stores/inventory/{item_id}/")
@@ -404,7 +404,7 @@ async def delete_inventory_item_by_id(item_id: int) -> dict:
     return {"message": "Item deleted successfully"}
 
 
-@app.tool
+@app.tool()
 async def inventory_receive(data: dict) -> dict:
     """
     Receive inventory items and update the stock.
@@ -423,7 +423,7 @@ async def inventory_receive(data: dict) -> dict:
     return {"inventory_item": result["data"]}
 
 
-@app.tool
+@app.tool()
 async def inventory_issue(data: dict) -> dict:
     """
     Issue inventory items and update the stock.
@@ -442,7 +442,7 @@ async def inventory_issue(data: dict) -> dict:
     return {"inventory_item": result["data"]}
 
 
-@app.tool
+@app.tool()
 async def filter_inventory_items(
     store_id: int | None = None,
     category_id: int | None = None,
@@ -475,8 +475,10 @@ async def _shutdown():
 
 
 if __name__ == "__main__":
-    try:
-        app.run()
-    finally:
+    #try:
+    #    app.run(transport='sse')
+    #finally:
         # best-effort cleanup; if event loop is still running, schedule close
-        asyncio.run(_shutdown())
+    #    asyncio.run(_shutdown())
+    
+    app.run()
