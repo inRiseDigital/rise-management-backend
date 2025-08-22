@@ -7,7 +7,7 @@ client = OpenAI()
 url = 'https://410837ae44c0.ngrok-free.app/mcp'
 
 
-client = OpenAI(api_key="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")
+client = OpenAI(api_key="")
 
 
 resp = client.responses.create(
