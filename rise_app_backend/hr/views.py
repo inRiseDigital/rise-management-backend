@@ -123,7 +123,7 @@ class AllocationCreateView(generics.CreateAPIView):
     serializer_class = AllocationSerializer
 #--------------
 class LeaveListView(APIView):
-    # permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
         leaves = leave.objects.all()
@@ -138,7 +138,7 @@ class LeaveListView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class LeaveListDetails(APIView):
-    # permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_object(self, pk):
         return get_object_or_404(leave, pk=pk)
