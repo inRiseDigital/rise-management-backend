@@ -493,4 +493,4 @@ if __name__ == "__main__":
         # best-effort cleanup; if event loop is still running, schedule close
     #    asyncio.run(_shutdown())
     print("Starting MCP server...")
-    app.run(transport="streamable-http",port=9000)
+    app.run(transport="streamable-http",port=9000, path = "/mcp")

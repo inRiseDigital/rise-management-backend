@@ -79,124 +79,100 @@ async def request_json(method: str, url: str, **kwargs) -> dict:
         return {"error": str(e), "status": None}
 
 
-# === Stores ===
+
 
 @app.tool()
-async def project_create() -> dict:
-    """Create new project  from the Django backend API.
+async def get_all_expences_categories() -> dict:
+    """Retrive All expences categories deals  from the Django backend API.
+
+    This tool sends a GET request to the Django endpoint
+    `/repair_expenses/categories/` and create new MEP project.
+    """
+    result = await request_json("GET", f"{BASE_URL}/repair_expenses/categories/")
+    if "error" in result:
+        return {"error": result["error"], "status": result.get("status")}
+    return {"stores": result["data"]}
+
+@app.tool()
+async def create_expence_category(name: str) -> dict:
+    """Create a new expence category in the Django backend API.
 
     This tool sends a POST request to the Django endpoint
-    `/mep/MEP_projects/` and create new MEP project.
+    `/repair_expenses/categories/` to create a new expence category.
     """
-    result = await request_json("POST", f"{BASE_URL}/mep/MEP_projects/")
+    data = {"name": name}
+    result = await request_json("POST", f"{BASE_URL}/repair_expenses/categories/", json=data)
     if "error" in result:
         return {"error": result["error"], "status": result.get("status")}
-    return {"stores": result["data"]}
+    return {"category": result["data"]}
 
 @app.tool()
-async def project_list() -> dict:
-    """List all MEP projects from the Django backend API.
+async def get_expences_category_by_id(id: int) -> dict:
+    """Retrieve expences category by ID from the Django backend API.
 
     This tool sends a GET request to the Django endpoint
-    `/mep/MEP_projects/` and retrieves all MEP projects.
+    `/repair_expenses/categories/{id}/` to fetch expences details.
     """
-    result = await request_json("GET", f"{BASE_URL}/mep/MEP_projects/")
+    result = await request_json("GET", f"{BASE_URL}/repair_expenses/categories/{id}/")
     if "error" in result:
         return {"error": result["error"], "status": result.get("status")}
-    return {"stores": result["data"]}
-
+    return {"expense": result["data"]}
+   
 @app.tool()
-async def project_delete(project_id: str) -> dict:
-    """Delete a MEP project by ID from the Django backend API.
-
-    This tool sends a DELETE request to the Django endpoint
-    `/mep/MEP_projects/<project_id>/` to delete the specified project.
-    """
-    result = await request_json("DELETE", f"{BASE_URL}/mep/MEP_projects/{project_id}/")
-    if "error" in result:
-        return {"error": result["error"], "status": result.get("status")}
-    return {"message": "Project deleted successfully"}  
-
-@app.tool()
-async def project_get(project_id: str) -> dict:
-    """Get a MEP project by ID from the Django backend API.
-
-    This tool sends a GET request to the Django endpoint
-    `/mep/MEP_projects/<project_id>/` to retrieve the specified project.
-    """
-    result = await request_json("GET", f"{BASE_URL}/mep/MEP_projects/{project_id}/")
-    if "error" in result:
-        return {"error": result["error"], "status": result.get("status")}
-    return {"project": result["data"]}
-
-@app.tool()
-async def project_update(project_id: int, data: dict) -> dict:
-    """Update a MEP project by ID from the Django backend API.
+async def update_expence_category(id: int, name: str) -> dict:
+    """Update an existing expence category in the Django backend API.
 
     This tool sends a PUT request to the Django endpoint
-    `/mep/MEP_projects/<project_id>/` to update the specified project with new data.
+    `/repair_expenses/categories/{id}/` to update expence details.
     """
-    result = await request_json("PUT", f"{BASE_URL}/mep/MEP_projects/{project_id}/", json=data)
+    data = {"name": name}
+    result = await request_json("PUT", f"{BASE_URL}/repair_expenses/categories/{id}/", json=data)
     if "error" in result:
         return {"error": result["error"], "status": result.get("status")}
-    return {"project": result["data"]}
+    return {"category": result["data"]}
 
 @app.tool()
-async def create_new_task(project_id: int, task_data: dict) -> dict:
-    """Create a new task in a MEP project.
-
-    This tool sends a POST request to the Django endpoint
-    `/mep/MEP_projects/<project_id>/tasks/` to create a new task in the specified project.
-    """
-    result = await request_json("POST", f"{BASE_URL}/mep/MEP_projects/{project_id}/tasks/", json=task_data)
-    if "error" in result:
-        return {"error": result["error"], "status": result.get("status")}
-    return {"task": result["data"]}
-
-@app.tool()
-async def list_tasks(task_id: str) -> dict:
-    """List all tasks in a MEP project.
-
-    This tool sends a GET request to the Django endpoint
-    `/mep/MEP_projects/<project_id>/tasks/` to retrieve all tasks in the specified project.
-    """
-    result = await request_json("GET", f"{BASE_URL}/mep/MEP_projects/{task_id}/tasks/")
-    if "error" in result:
-        return {"error": result["error"], "status": result.get("status")}
-    return {"tasks": result["data"]}
-
-@app.tool()
-async def delete_task(id: int) -> dict:
-    """Delete a task by ID from a MEP project.
+async def delete_expence_category(id: int) -> dict:
+    """Delete an expence category by ID from the Django backend API.
 
     This tool sends a DELETE request to the Django endpoint
-    `/mep/MEP_projects/<project_id>/tasks/<task_id>/` to delete the specified task.
+    `/repair_expenses/categories/{id}/` to remove the expence category.
     """
-    result = await request_json("DELETE", f"{BASE_URL}/mep/MEP_projects/{id}/tasks/")
+    result = await request_json("DELETE", f"{BASE_URL}/repair_expenses/categories/{id}/")
     if "error" in result:
         return {"error": result["error"], "status": result.get("status")}
-    return {"message": "Task deleted successfully"}
+    return {"status": "deleted"}
 
 @app.tool()
-async def get_task(id: int) -> dict:
-    """Get a task by ID from a MEP project.
+async def get_all_expences() -> dict:
+    """Retrive All expences deals  from the Django backend API.
 
     This tool sends a GET request to the Django endpoint
-    `/mep/MEP_projects/<project_id>/tasks/<task_id>/` to retrieve the specified task.
+    `/repair_expenses/` and create new MEP project.
     """
-    result = await request_json("GET", f"{BASE_URL}/mep/MEP_projects/{id}/tasks/")
+    result = await request_json("GET", f"{BASE_URL}/repair_expenses/")
     if "error" in result:
         return {"error": result["error"], "status": result.get("status")}
-    return {"task": result["data"]}
+    return {"stores": result["data"]}
 
 @app.tool()
-async def get_ongoin_task(project_id: int) -> dict:
-    """Get all ongoing tasks from the MEP project.
+async def create_expence(date: str, responsible_person: str,category: str, subcategory: str, bill_img: str,bill_no: str, cost: float, description: str ) -> dict:
+    """Create a new expence in the Django backend API.
 
-    This tool sends a GET request to the Django endpoint
-    `/mep/MEP_projects/<int:project_id>/tasks/ongoing/` to retrieve all ongoing tasks.
+    This tool sends a POST request to the Django endpoint
+    `/repair_expenses/` to create a new expence.
     """
-    result = await request_json("GET", f"{BASE_URL}/mep/MEP_projects/{project_id}/tasks/ongoing/")
+    data = {
+        "date": date,
+        "responsible_person": responsible_person,
+        "category": category,
+        "subcategory": subcategory,
+        "bill_img": bill_img,
+        "bill_no": bill_no,
+        "cost": cost,
+        "description": description
+    }
+    result = await request_json("POST", f"{BASE_URL}/repair_expenses/", json=data)
     if "error" in result:
         return {"error": result["error"], "status": result.get("status")}
-    return {"tasks": result["data"]}
+    return {"expense": result["data"]}

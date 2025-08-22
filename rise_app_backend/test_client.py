@@ -4,10 +4,10 @@ load_dotenv()
 client = OpenAI() 
 
 
-url = 'https://f59d5dc9a634.ngrok-free.app/mcp/'
+url = 'https://410837ae44c0.ngrok-free.app/mcp'
 
 
-client = OpenAI(api_key="")
+client = OpenAI(api_key="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")
 
 
 resp = client.responses.create(
@@ -20,7 +20,7 @@ resp = client.responses.create(
             "require_approval": "never",
         },
     ],
-    input="hi",
+    input="what can you do?",
 )
 
 print(resp.output_text)
