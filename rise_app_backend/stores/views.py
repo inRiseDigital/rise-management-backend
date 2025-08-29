@@ -4,18 +4,22 @@ from rest_framework import status
 from django.shortcuts import get_object_or_404
 from django.core.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.generics import ListAPIView
+from django.utils.dateparse import parse_datetime
+
+
 
 from .models import (
     Store,
     ProductCategory,
     ProductSubCategory,
-    InventoryItem
+    InventoryItem,InventoryMovement
 )
 from .serializers import (
     StoreSerializer,
     ProductCategorySerializer,
     ProductSubCategorySerializer,
-    InventoryItemSerializer
+    InventoryItemSerializer,InventoryMovementSerializer
 )
 
 # ── Store CRUD ─────────────────────────────────────────────
@@ -124,7 +128,10 @@ class ProductSubCategoryDetail(APIView):
     def delete(self, request, pk):
         obj = get_object_or_404(ProductSubCategory, pk=pk)
         obj.delete()
-        return Response(status=204)
+        return Response(
+            {"ok": True, "message": "Subcategory deleted"},
+            status=status.HTTP_200_OK
+        )
     
 # get subcategory by category id. 
 class ProductSubCategoryByCategory(APIView):
@@ -196,12 +203,9 @@ class InventoryReceive(APIView):
         cost  = request.data.get("cost_per_unit")
 
         if units is None or cost is None:
-            return Response(
-                {"error": "Both 'units' and 'cost_per_unit' are required"},
-                status=400
-            )
+            return Response({"error": "Both 'units' and 'cost_per_unit' are required"}, status=400)
 
-        # This will update item.units_in_stock and item.unit_cost
+        # Updates stock and writes a movement row (Option A)
         item.receive(units, cost)
         return Response(InventoryItemSerializer(item).data)
 
@@ -217,12 +221,41 @@ class InventoryIssue(APIView):
             return Response({"error": "'units' is required"}, status=400)
 
         try:
-            # This will decrease item.units_in_stock
+            # Decreases stock and writes a movement row (Option A)
             item.issue(units)
         except ValidationError as exc:
             return Response({"error": str(exc)}, status=400)
 
         return Response(InventoryItemSerializer(item).data)
+
+
+class MovementListView(ListAPIView):
+    """List history with simple filters: ?direction=IN|OUT&store_id=&item_id=&start=&end="""
+    permission_classes = [AllowAny]
+    serializer_class = InventoryMovementSerializer
+
+    def get_queryset(self):
+        qs = (InventoryMovement.objects
+              .select_related("item", "item__store", "item__category", "item__subcategory"))
+
+        direction = self.request.query_params.get("direction")  # IN / OUT
+        store_id  = self.request.query_params.get("store_id")
+        item_id   = self.request.query_params.get("item_id")
+        start     = self.request.query_params.get("start")       # ISO datetime
+        end       = self.request.query_params.get("end")
+
+        if direction in {"IN", "OUT"}:
+            qs = qs.filter(direction=direction)
+        if store_id:
+            qs = qs.filter(item__store_id=store_id)
+        if item_id:
+            qs = qs.filter(item_id=item_id)
+        if start:
+            qs = qs.filter(occurred_at__gte=parse_datetime(start))
+        if end:
+            qs = qs.filter(occurred_at__lte=parse_datetime(end))
+
+        return qs.order_by("-occurred_at")
 
 
 # ── Filter endpoint ────────────────────────────────────────
@@ -253,4 +286,13 @@ class InventoryFilterView(APIView):
         data = InventoryItemSerializer(qs, many=True).data
         return Response({"store":store.name, "items":data})
 
+class get_store_by_name(APIView):
+    permission_classes = [AllowAny]
+    def get(self, request, name):
+        """
+        GET /stores/store/name/<name>/
+        Returns store details for the given store name.
+        """
+        obj = get_object_or_404(Store, name=name)
+        return Response(StoreSerializer(obj).data)
 

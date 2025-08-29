@@ -5,6 +5,9 @@ import logging
 from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 from fastmcp.tools import tool
+from fastmcp import FastMCP
+import requests
+from typing import Dict, Any
 
 load_dotenv()
 BASE_URL = os.getenv("BASE_URL")
@@ -15,9 +18,9 @@ if not BASE_URL:
 
 # configure logging
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("django-mcp-server")
+logger = logging.getLogger("cattle-hut-mcp-server")
 
-app = FastMCP("django-mcp-server")
+app = FastMCP("cattle-hut-mcp-server")
 
 # Shared session
 _shared_session: aiohttp.ClientSession | None = None
@@ -258,3 +261,12 @@ async def get_month_to_date_income(date: str = None) -> dict:
     if "error" in result:
         return {"error": result["error"], "status": result.get("status")}
     return {"month_to_date_income": result["data"]}
+
+if __name__ == "__main__":
+    #try:
+    #    app.run(transport='sse')
+    #finally:
+        # best-effort cleanup; if event loop is still running, schedule close
+    #    asyncio.run(_shutdown())
+    print("Starting MCP SSE server on http://127.0.0.1:9000")
+    app.run(transport="sse", host="127.0.0.1", port=9000)

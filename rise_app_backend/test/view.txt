@@ -1,0 +1,36 @@
+class InventoryReceive(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request, pk):
+        item = get_object_or_404(InventoryItem, pk=pk)
+        units = request.data.get("units")
+        cost  = request.data.get("cost_per_unit")
+
+        if units is None or cost is None:
+            return Response(
+                {"error": "Both 'units' and 'cost_per_unit' are required"},
+                status=400
+            )
+
+        # This will update item.units_in_stock and item.unit_cost
+        item.receive(units, cost)
+        return Response(InventoryItemSerializer(item).data)
+
+
+class InventoryIssue(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request, pk):
+        item = get_object_or_404(InventoryItem, pk=pk)
+        units = request.data.get("units")
+
+        if units is None:
+            return Response({"error": "'units' is required"}, status=400)
+
+        try:
+            # This will decrease item.units_in_stock
+            item.issue(units)
+        except ValidationError as exc:
+            return Response({"error": str(exc)}, status=400)
+
+        return Response(InventoryItemSerializer(item).data)

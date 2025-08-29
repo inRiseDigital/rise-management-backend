@@ -7,6 +7,7 @@ from mcp.server.fastmcp import FastMCP
 from fastmcp.tools import tool
 from fastmcp import FastMCP
 import requests
+from typing import Dict, Any
 
 load_dotenv()
 BASE_URL = os.getenv("BASE_URL")
@@ -86,11 +87,19 @@ async def request_json(method: str, url: str, **kwargs) -> dict:
 
 @app.tool
 async def get_stores() -> dict:
-    """Retrieve all stores list of from the Django backend API.
+    """
+    List all stores.
 
-    This tool sends a GET request to the Django endpoint
-    `/stores/add_stores/` and returns all available store data
-    as a dictionary.
+    HTTP:
+        GET /stores/add_stores/
+
+    Returns:
+        {"stores": <server JSON>} on success,
+        or {"error": <str|obj>, "status": <int>, "details"?: <str>} on failure.
+
+    Notes:
+        • Not for creating categories.
+        • Not for validating store IDs when an ID is already supplied elsewhere.
     """
     try:
         res=requests.get("http://127.0.0.1:8000/stores/add_stores/")
@@ -108,53 +117,93 @@ async def get_stores() -> dict:
 
 
 @app.tool
-async def add_store() -> dict:
-    """Create a new store entry and return the resulting stores payload.
+async def add_store(name: str) -> dict:
+    """
+    Create a new store and return the server payload.
 
-    This tool makes a POST request to your Django backend to add a store
-    (or trigger whatever logic lives at that endpoint) and then returns
-    the server’s JSON response under the key "store".
-
-    Endpoint:
-        POST http://127.0.0.1:8000/stores/add_stores/
+    Args:
+        name: The store name to create.
 
     Returns:
-        dict: {
-            "store": <The JSON-decoded response from the server>
+        {
+            "store": <server JSON (entire response or its 'data' field if present)>
         }
-
-    Raises:
-        aiohttp.ClientError: On network or protocol errors.
-        asyncio.TimeoutError: If the request takes too long.
+        or on failure:
+        {
+            "error": "<string>",
+            "status": <optional int>,
+            "message": "<optional details>"
+        }
     """
-    result = await request_json("POST", f"{BASE_URL}/stores/add_stores/")
-    if "error" in result:
-        return {"error": result["error"], "status": result.get("status")}
-    return {"store": result["data"]}
+    try:
+        payload = {"name": name}
+        result: Dict[str, Any] = await request_json(
+            "POST",
+            f"{BASE_URL}/stores/add_stores/",
+            json=payload,
+            timeout=10,
+        )
+    except asyncio.TimeoutError as e:
+        return {"error": "TIMEOUT", "message": str(e)}
+    except aiohttp.ClientError as e:
+        return {"error": "NETWORK", "message": str(e)}
+
+    if isinstance(result, dict) and "error" in result:
+        # assuming your helper may normalize server errors like this
+        return {"error": result.get("error"), "status": result.get("status"), "message": result.get("message")}
+
+    # Prefer 'data' when present, else return whole result
+    return {"store": result.get("data", result)}
 
 
 @app.tool
 async def get_store_by_id(store_id: int) -> dict:
     """
-    Fetch a specific store by its ID.
+    Retrieve a store by ID.
 
-    This tool sends a GET request to the Django endpoint
-    `/stores/stores/{store_id}/` and returns the store data
-    as a dictionary.
-    
-    Args:
-        store_id (int): The ID of the store to retrieve.
+    HTTP:
+        GET /stores/add_stores/{store_id}/
+
+    Path:
+        store_id (int) — store primary key.
 
     Returns:
-        dict: The store data.
+        {"store": <store JSON>} on success,
+        {"error": "Store not found", "status": 404} if missing,
+        or {"error": <str|obj>, "status": <int>} on other failures.
     """
-    result = await request_json("GET", f"{BASE_URL}/stores/stores/{store_id}/")
+    result = await request_json("GET", f"{BASE_URL}/stores/add_stores/{store_id}/")
     if "error" in result:
         if result.get("status") == 404:
             return {"error": "Store not found", "status": 404}
         return {"error": result["error"], "status": result.get("status")}
     return {"store": result["data"]}
 
+@app.tool
+async def get_store_by_name(name: str) -> dict:
+    """
+    Retrieve a store by name.
+
+    HTTP:
+        GET /stores/add_stores/{name}/
+
+    Path:
+        name (str) — store name.
+
+    Returns:
+        {"store": <store JSON>} on success,
+        {"error": "Store not found", "status": 404} if missing,
+        or {"error": <str|obj>, "status": <int>} on other failures.
+
+    Notes:
+        Endpoint path shape follows current backend routing.
+    """
+    result = await request_json("GET", f"{BASE_URL}/stores/add_stores/{name}/")
+    if "error" in result:
+        if result.get("status") == 404:
+            return {"error": "Store not found", "status": 404}
+        return {"error": result["error"], "status": result.get("status")}
+    return {"store": result["data"]}
 
 @app.tool
 async def update_store_by_id(store_id: int, data: dict) -> dict:
@@ -162,7 +211,7 @@ async def update_store_by_id(store_id: int, data: dict) -> dict:
     Update a specific store by its ID.
 
     This tool sends a PUT request to the Django endpoint
-    `/stores/stores/{store_id}/` and returns the store data
+    `/stores/add_stores/{store_id}/` and returns the store data
     as a dictionary.
     
     Args:
@@ -185,7 +234,7 @@ async def delete_store_by_id(store_id: int) -> dict:
     Delete a specific store by its ID.
 
     This tool sends a DELETE request to the Django endpoint
-    `/stores/stores/{store_id}/` and returns the store data
+    `/stores/add_stores/{store_id}/` and returns the store data
     as a dictionary.
     
     Args:
@@ -205,25 +254,28 @@ async def delete_store_by_id(store_id: int) -> dict:
 # === Product Categories ===
 
 @app.tool
-async def add_product_category(data: dict) -> dict:
+async def add_product_category(name: str, store: int) -> dict:
     """
-    Ceare a new product category.
+    Create a new product category.
 
-    This tool sends a POST request to the Django endpoint
-    `/stores/categories/` and returns the store data
-    as a dictionary.
-    
+    HTTP:
+        POST /stores/categories/
+
     Args:
-        store_id (int): The ID of the store to retrieve.
+        name:  Category name (str)
+        store: Store ID (int, FK)
 
     Returns:
-        dict: The category data id, name, and store.
+        {"product_category": {...}} on success,
+        or {"error": "...", "status": <int>} on failure.
     """
-    result = await request_json("POST", f"{BASE_URL}/stores/categories/", json=data)
+    payload = {"name": name, "store": store}
+    result = await request_json("POST", f"{BASE_URL}/stores/categories/", json=payload)
     if "error" in result:
-        if result.get("status") == 400:
-            return {"error": "Invalid data", "status": 400}
-        return {"error": result["error"], "status": result.get("status")}
+        status = result.get("status")
+        if status == 400:
+            return {"error": "Invalid data", "status": 400, "details": result.get("error")}
+        return {"error": result["error"], "status": status}
     return {"product_category": result["data"]}
 
 
@@ -296,7 +348,27 @@ async def update_product_category_by_id(category_id: int, data: dict) -> dict:
 
 @app.tool
 async def delete_product_category_by_id(category_id: int) -> dict:
-    """Delete a specific product category by its ID."""
+    """
+    Delete a specific product category by its ID.
+
+    This tool sends a DELETE request to the Django endpoint
+    `/stores/categories/{category_id}/` and returns a confirmation message
+    when the deletion succeeds.
+
+    Args:
+        category_id (int): The ID of the product category to delete.
+
+    Returns:
+        dict: On success:
+              {
+                  "message": "Category deleted successfully"
+              }
+              On failure:
+              {
+                  "error": "<reason>",
+                  "status": <HTTP status code>
+              }
+    """
     result = await request_json("DELETE", f"{BASE_URL}/stores/categories/{category_id}/")
     if "error" in result:
         if result.get("status") == 404:
@@ -309,7 +381,27 @@ async def delete_product_category_by_id(category_id: int) -> dict:
 
 @app.tool
 async def get_product_subcategories() -> dict:
-    """Retrieve all product subcategories."""
+    """
+    Retrieve all product subcategories.
+
+    This tool sends a GET request to the Django endpoint
+    `/stores/subcategories/` and returns the full list of product subcategories
+    as a dictionary.
+
+    Args:
+        None
+
+    Returns:
+        dict: On success:
+              {
+                  "product_subcategories": [ ... ]
+              }
+              On failure:
+              {
+                  "error": "<reason>",
+                  "status": <HTTP status code>
+              }
+    """
     result = await request_json("GET", f"{BASE_URL}/stores/subcategories/")
     if "error" in result:
         return {"error": result["error"], "status": result.get("status")}
@@ -318,7 +410,28 @@ async def get_product_subcategories() -> dict:
 
 @app.tool
 async def create_product_subcategory(data: dict) -> dict:
-    """Create a new product subcategory."""
+    """
+    Create a new product subcategory.
+
+    This tool sends a POST request to `/stores/subcategories/` to create a subcategory.
+
+    Required Payload:
+        data (dict): {
+            "category": int,   # ID of the parent ProductCategory (FK)
+            "name": str        # Subcategory name
+        }
+
+    Returns:
+        dict: On success:
+              {
+                  "product_subcategory": { ...created subcategory... }
+              }
+              On failure:
+              {
+                  "error": "<reason>",
+                  "status": <HTTP status code>
+              }
+    """
     result = await request_json("POST", f"{BASE_URL}/stores/subcategories/", json=data)
     if "error" in result:
         return {"error": result["error"], "status": result.get("status")}
@@ -327,7 +440,27 @@ async def create_product_subcategory(data: dict) -> dict:
 
 @app.tool
 async def get_product_subcategory_by_id(subcategory_id: int) -> dict:
-    """Retrieve a specific product subcategory by its ID."""
+    """
+    Retrieve a specific product subcategory by its ID.
+
+    This tool sends a GET request to the Django endpoint
+    `/stores/subcategories/{subcategory_id}/` and returns the subcategory data
+    as a dictionary.
+
+    Args:
+        subcategory_id (int): The ID of the product subcategory to retrieve.
+
+    Returns:
+        dict: On success:
+              {
+                  "product_subcategory": { ...subcategory fields... }
+              }
+              On failure:
+              {
+                  "error": "<reason>",
+                  "status": <HTTP status code>
+              }
+    """
     result = await request_json("GET", f"{BASE_URL}/stores/subcategories/{subcategory_id}/")
     if "error" in result:
         if result.get("status") == 404:
@@ -338,7 +471,32 @@ async def get_product_subcategory_by_id(subcategory_id: int) -> dict:
 
 @app.tool
 async def update_product_subcategory_by_id(subcategory_id: int, data: dict) -> dict:
-    """Update a specific product subcategory by its ID."""
+    """
+    Update a specific product subcategory by its ID.
+
+    This tool sends a PUT request to the Django endpoint
+    `/stores/subcategories/{subcategory_id}/` and returns the updated subcategory
+    as a dictionary.
+
+    Args:
+        subcategory_id (int): The ID of the product subcategory to update.
+        data (dict): Update payload. Expected keys:
+            - "name" (str): New subcategory name.
+            - "category" (int): ID of the parent ProductCategory (FK).
+          Note: The endpoint uses PUT (full update). If your view does not allow
+          partial updates, include all required fields even when changing only one.
+
+    Returns:
+        dict: On success:
+              {
+                  "product_subcategory": { ...updated subcategory... }
+              }
+              On failure:
+              {
+                  "error": "<reason>",
+                  "status": <HTTP status code>
+              }
+    """
     result = await request_json("PUT", f"{BASE_URL}/stores/subcategories/{subcategory_id}/", json=data)
     if "error" in result:
         return {"error": result["error"], "status": result.get("status")}
@@ -347,7 +505,27 @@ async def update_product_subcategory_by_id(subcategory_id: int, data: dict) -> d
 
 @app.tool
 async def delete_product_subcategory_by_id(subcategory_id: int) -> dict:
-    """Delete a specific product subcategory by its ID."""
+    """
+    Delete a specific product subcategory by its ID.
+
+    This tool sends a DELETE request to the Django endpoint
+    `/stores/subcategories/{subcategory_id}/` and returns a confirmation
+    message when the deletion succeeds.
+
+    Args:
+        subcategory_id (int): The ID of the product subcategory to delete.
+
+    Returns:
+        dict: On success:
+              {
+                  "message": "Subcategory deleted successfully"
+              }
+              On failure:
+              {
+                  "error": "<reason>",
+                  "status": <HTTP status code>
+              }
+    """
     result = await request_json("DELETE", f"{BASE_URL}/stores/subcategories/{subcategory_id}/")
     if "error" in result:
         if result.get("status") == 404:
@@ -358,7 +536,27 @@ async def delete_product_subcategory_by_id(subcategory_id: int) -> dict:
 
 @app.tool
 async def get_product_subcategories_by_category_id(category_id: int) -> dict:
-    """Retrieve all product subcategories for a specific category."""
+    """
+    Retrieve all product subcategories for a specific category.
+
+    This tool sends a GET request to the Django endpoint
+    `/stores/subcategories/category/{category_id}/` and returns the list of
+    subcategories that belong to the given category.
+
+    Args:
+        category_id (int): The ID of the parent ProductCategory.
+
+    Returns:
+        dict: On success:
+              {
+                  "product_subcategories": [ ...subcategories... ]
+              }
+              On failure:
+              {
+                  "error": "<reason>",
+                  "status": <HTTP status code>
+              }
+    """
     result = await request_json("GET", f"{BASE_URL}/stores/subcategories/category/{category_id}/")
     if "error" in result:
         return {"error": result["error"], "status": result.get("status")}
@@ -369,7 +567,31 @@ async def get_product_subcategories_by_category_id(category_id: int) -> dict:
 
 @app.tool
 async def get_inventory_items() -> dict:
-    """Retrieve all inventory items."""
+    """
+    Retrieve all inventory items.
+
+    This tool sends a GET request to the Django endpoint
+    `/stores/inventory/` and returns the full list of inventory items
+    (current stock and average cost). 
+
+    Note:
+        Use this for current balances. For movement history (IN/OUT ledger),
+        call `get_inventory_movements()` instead.
+
+    Args:
+        None
+
+    Returns:
+        dict: On success:
+              {
+                  "inventory_items": [ ... ]
+              }
+              On failure:
+              {
+                  "error": "<reason>",
+                  "status": <HTTP status code>
+              }
+    """
     result = await request_json("GET", f"{BASE_URL}/stores/inventory/")
     if "error" in result:
         return {"error": result["error"], "status": result.get("status")}
@@ -378,7 +600,30 @@ async def get_inventory_items() -> dict:
 
 @app.tool
 async def create_inventory_item(data: dict) -> dict:
-    """Create a new inventory item."""
+    """
+    Create a new inventory item.
+
+    This tool sends a POST request to the Django endpoint
+    `/stores/inventory/` to create an inventory record.
+
+    Required Payload (data):
+        store (int):        ID of the Store (FK).
+        category (int):     ID of the ProductCategory (FK).
+        subcategory (int):  ID of the ProductSubCategory (FK).
+        units_in_stock (number | Decimal): Opening quantity (e.g.,  "5.00" or 5).
+        unit_cost (number | Decimal):      Average unit cost (e.g., "61.6700" or 61.67).
+
+    Returns:
+        dict: On success:
+              {
+                  "inventory_item": { ...created item... }
+              }
+              On failure:
+              {
+                  "error": "<reason>",
+                  "status": <HTTP status code>
+              }
+    """
     result = await request_json("POST", f"{BASE_URL}/stores/inventory/", json=data)
     if "error" in result:
         return {"error": result["error"], "status": result.get("status")}
@@ -453,6 +698,18 @@ async def inventory_issue(data: dict) -> dict:
         return {"error": result["error"], "status": result.get("status")}
     return {"inventory_item": result["data"]}
 
+@app.tool
+async def get_inventory_movements() -> dict:
+    """Inventory **history** tool.
+    Use for movement **ledger / history / transactions / IN / OUT**.
+    Calls GET /stores/inventory/movements/ and returns {"inventory_movements":[...]}.
+    Do **not** use this for current stock or item listings.
+    """
+    result = await request_json("GET", f"{BASE_URL}/stores/inventory/movements/")
+    if "error" in result:
+        return {"error": result["error"], "status": result.get("status")}
+    return {"inventory_movements": result["data"]}
+
 
 @app.tool
 async def filter_inventory_items(
@@ -492,5 +749,5 @@ if __name__ == "__main__":
     #finally:
         # best-effort cleanup; if event loop is still running, schedule close
     #    asyncio.run(_shutdown())
-    print("Starting MCP server...")
-    app.run(transport="streamable-http",port=9000, path = "/mcp")
+    print("Starting MCP SSE server on http://127.0.0.1:9000")
+    app.run(transport="sse",host="127.0.0.1", port=9000)

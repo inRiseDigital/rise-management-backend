@@ -5,13 +5,13 @@ from .views import (
   ProductSubCategoryListCreate, ProductSubCategoryDetail,
   InventoryItemListCreate, InventoryItemDetail,
   InventoryReceive, InventoryIssue,
-  InventoryFilterView,ProductSubCategoryByCategory
+  InventoryFilterView,ProductSubCategoryByCategory, MovementListView
 )
 
 urlpatterns = [
     # Stores
     path("add_stores/", StoreListCreate.as_view(),   name="store-list-create"),
-    path("stores/<int:pk>/", StoreDetail.as_view(),       name="store-detail"),
+    path("add_stores/<int:pk>/", StoreDetail.as_view(),       name="store-detail"),
 
     # Categories
     path("categories/",           ProductCategoryListCreate.as_view(), name="cat-list-create"),
@@ -33,5 +33,9 @@ urlpatterns = [
     path("inventory/filter/",     InventoryFilterView.as_view(), name="inv-filter"),
     
     #subcategory by category
-    path("subcategories/category/<int:category>/", ProductSubCategoryByCategory.as_view(), name="subcat-by-category")
+    path("subcategories/category/<int:category>/", ProductSubCategoryByCategory.as_view(), name="subcat-by-category"),
+    
+    path("inventory/movements/",        MovementListView.as_view(), name="inventory-movements"),
+    
+
 ]
