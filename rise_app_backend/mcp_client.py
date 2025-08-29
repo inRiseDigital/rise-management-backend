@@ -1,6 +1,6 @@
 from openai import OpenAI
 
-client = OpenAI(api_key="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")
+client = OpenAI(api_key="")
 
 SYSTEM_FMT = """
 Role
