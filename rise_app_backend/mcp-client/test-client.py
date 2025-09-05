@@ -243,7 +243,7 @@ You are now ready to operate the Cattle Hut MCP tools confidently and safely.
 TOOLS = [{
     "type": "mcp",
     "server_label": "django-mcp-server",
-    "server_url": "https://f3592c7a9631.ngrok-free.app/sse",
+    "server_url": "##/sse",
     "require_approval": "never",
 }]
 

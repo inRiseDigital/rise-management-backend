@@ -135,7 +135,7 @@ Remember: **EXACT TOOL ROUTING** is critical. Always match user intent to the co
 TOOLS = [{
     "type": "mcp",
     "server_label": "django-mcp-server",
-    "server_url": "https://7e65e5216722.ngrok-free.app/sse",
+    "server_url": "/sse",
     "require_approval": "never",
 }]
 

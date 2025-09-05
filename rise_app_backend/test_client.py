@@ -3,7 +3,7 @@ import os
 from dotenv import load_dotenv
 
 load_dotenv()
-client = OpenAI(api_key="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")
+client = OpenAI(api_key="")
 
 resp = client.responses.create(
     model="gpt-4o",
