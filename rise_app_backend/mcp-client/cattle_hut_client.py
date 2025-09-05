@@ -138,7 +138,7 @@ Examples (routing)
 TOOLS = [{
     "type": "mcp",
     "server_label": "django-mcp-server",
-    "server_url": "https://0cf9996d11cb.ngrok-free.app/sse",
+    "server_url": "https://7e65e5216722.ngrok-free.app/sse",
     "require_approval": "never",
 }]
 

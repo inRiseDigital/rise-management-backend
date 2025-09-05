@@ -5,7 +5,7 @@ from .views import (
   ProductSubCategoryListCreate, ProductSubCategoryDetail,
   InventoryItemListCreate, InventoryItemDetail,
   InventoryReceive, InventoryIssue,
-  InventoryFilterView,ProductSubCategoryByCategory, MovementListView
+  InventoryFilterView,ProductSubCategoryByCategory, MovementListView,get_store_by_name
 )
 
 urlpatterns = [
@@ -36,6 +36,10 @@ urlpatterns = [
     path("subcategories/category/<int:category>/", ProductSubCategoryByCategory.as_view(), name="subcat-by-category"),
     
     path("inventory/movements/",        MovementListView.as_view(), name="inventory-movements"),
+    
+    path("by_name/", get_store_by_name.as_view(), name="get_store_by_name"),
+    
+    
     
 
 ]

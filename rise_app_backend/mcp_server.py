@@ -8,10 +8,12 @@ from fastmcp.tools import tool
 from fastmcp import FastMCP
 import requests
 from typing import Dict, Any
+import httpx
 
 load_dotenv()
 BASE_URL = os.getenv("BASE_URL")
 API_TOKEN = os.getenv("API_TOKEN")  # optional: e.g., Bearer token or similar
+TIMEOUT = 10.0
 
 if not BASE_URL:
     raise RuntimeError("BASE_URL is not set in environment")
@@ -182,28 +184,38 @@ async def get_store_by_id(store_id: int) -> dict:
 @app.tool
 async def get_store_by_name(name: str) -> dict:
     """
-    Retrieve a store by name.
-
-    HTTP:
-        GET /stores/add_stores/{name}/
-
-    Path:
-        name (str) — store name.
+    Simple wrapper for GET {BASE_URL}/stores/by_name/?name=<name>
 
     Returns:
-        {"store": <store JSON>} on success,
-        {"error": "Store not found", "status": 404} if missing,
-        or {"error": <str|obj>, "status": <int>} on other failures.
-
-    Notes:
-        Endpoint path shape follows current backend routing.
+      {"store": <object>} on 200,
+      {"error": "name required", "status": 400} if input is empty,
+      {"error": "Store not found", "status": 404} if backend returns 404,
+      {"error": <text>, "status": <int>} for other failures.
     """
-    result = await request_json("GET", f"{BASE_URL}/stores/add_stores/{name}/")
-    if "error" in result:
-        if result.get("status") == 404:
-            return {"error": "Store not found", "status": 404}
-        return {"error": result["error"], "status": result.get("status")}
-    return {"store": result["data"]}
+    # mirror the APIView behavior: require non-empty name
+    if not name or str(name).strip() == "":
+        return {"error": "name query param required", "status": 400}
+
+    url = f"{BASE_URL}/stores/by_name/"
+    params = {"name": name}
+
+    async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+        try:
+            resp = await client.get(url, params=params)
+        except httpx.RequestError as exc:
+            return {"error": f"request failed: {exc}", "status": 0}
+
+    if resp.status_code == 200:
+        try:
+            return {"store": resp.json()}
+        except ValueError:
+            return {"error": "invalid JSON response", "status": resp.status_code}
+
+    if resp.status_code == 404:
+        return {"error": "Store not found", "status": 404}
+
+    # fallback: return server response text for debugging
+    return {"error": resp.text, "status": resp.status_code}
 
 @app.tool
 async def update_store_by_id(store_id: int, data: dict) -> dict:
@@ -328,7 +340,7 @@ async def update_product_category_by_id(category_id: int, data: dict) -> dict:
     """
     Update a specific category by its ID.
 
-    This tool sends a GET request to the Django endpoint
+    This tool sends a PUT request to the Django endpoint
     `/stores/categories/{category_id}/` and returns the updated category data
     as a dictionary.
     
@@ -632,7 +644,30 @@ async def create_inventory_item(data: dict) -> dict:
 
 @app.tool
 async def get_inventory_item_by_id(item_id: int) -> dict:
-    """Retrieve a specific inventory item by its ID."""
+    
+    """Fetch a single inventory item by its ID.
+
+    Sends a GET request to ``{BASE_URL}/stores/inventory/{item_id}/`` and
+    returns a normalized payload. If the backend returns 404, a friendly
+    "Item not found" message is included.
+
+    Args:
+        item_id: Primary key of the inventory item to retrieve.
+
+    Returns:
+        dict:
+            - Success: ``{"inventory_item": <dict>}``.
+            - Not found: ``{"error": "Item not found", "status": 404}``.
+            - Other error: ``{"error": <str>, "status": <int | None>}``.
+
+    Raises:
+        Any exception raised by ``request_json`` (e.g., network errors) will
+        propagate to the caller.
+
+    Example:
+        >>> await get_inventory_item_by_id(12)
+        {'inventory_item': {'id': 12, 'name': 'Mineral Mix', 'sku': 'MM-001', ...}}
+    """
     result = await request_json("GET", f"{BASE_URL}/stores/inventory/{item_id}/")
     if "error" in result:
         if result.get("status") == 404:
@@ -643,7 +678,31 @@ async def get_inventory_item_by_id(item_id: int) -> dict:
 
 @app.tool
 async def update_inventory_item_by_id(item_id: int, data: dict) -> dict:
-    """Update a specific inventory item."""
+    """Update an inventory item by ID via the backend API.
+
+    Sends a PUT request to ``{BASE_URL}/stores/inventory/{item_id}/`` with a JSON
+    payload. The backend view accepts **partial** updates (server-side uses
+    ``partial=True``), so ``data`` may contain any subset of fields accepted by
+    ``InventoryItemSerializer``.
+
+    Args:
+        item_id: Primary key of the inventory item to update.
+        data: JSON-serializable payload with serializer-defined fields
+            (e.g., name, quantity, notes). Only include fields you intend to change.
+
+    Returns:
+        dict:
+            - Success: ``{"inventory_item": <dict>}`` (the updated resource).
+            - Failure: ``{"error": <str | dict>, "status": <int | None>}``.
+
+    Raises:
+        Any exception raised by ``request_json`` (e.g., network errors) will
+        propagate to the caller.
+
+    Example:
+        >>> await update_inventory_item_by_id(12, {"quantity": 50})
+        {'inventory_item': {'id': 12, 'quantity': 50, ...}}
+    """
     result = await request_json("PUT", f"{BASE_URL}/stores/inventory/{item_id}/", json=data)
     if "error" in result:
         return {"error": result["error"], "status": result.get("status")}
@@ -652,7 +711,29 @@ async def update_inventory_item_by_id(item_id: int, data: dict) -> dict:
 
 @app.tool
 async def delete_inventory_item_by_id(item_id: int) -> dict:
-    """Delete a specific inventory item."""
+    """Delete an inventory item by its ID via the backend API.
+
+    Sends a DELETE request to ``{BASE_URL}/stores/inventory/{item_id}/``.
+    On success, returns a confirmation message. If the backend responds
+    with a 404, a friendly "Item not found" error is returned.
+
+    Args:
+        item_id: Primary key of the inventory item to delete.
+
+    Returns:
+        dict:
+            - Success: ``{"message": "Item deleted successfully"}``.
+            - Not found: ``{"error": "Item not found", "status": 404}``.
+            - Other error: ``{"error": <str | dict>, "status": <int | None>}``.
+
+    Raises:
+        Any exception raised by ``request_json`` (e.g., network issues) will
+        propagate to the caller.
+
+    Example:
+        >>> await delete_inventory_item_by_id(12)
+        {'message': 'Item deleted successfully'}
+    """
     result = await request_json("DELETE", f"{BASE_URL}/stores/inventory/{item_id}/")
     if "error" in result:
         if result.get("status") == 404:
@@ -663,9 +744,34 @@ async def delete_inventory_item_by_id(item_id: int) -> dict:
 
 @app.tool
 async def inventory_receive(data: dict) -> dict:
-    """
-    Receive inventory items and update the stock.
-    Expects keys: item_id (int), units (int), cost_per_unit (float)
+    """Receive (ingress) inventory units for an item and update stock.
+
+    Expects ``item_id`` in the input payload and posts the remaining fields to
+    ``{BASE_URL}/stores/inventory/receive/{item_id}/``. The backend updates the
+    item's stock and records a movement entry.
+
+    Args:
+        data: JSON-serializable payload with:
+            - ``item_id`` (int, required): Primary key of the inventory item.
+              This key is removed from the payload and used in the URL path.
+            - ``units`` (int, required): Number of units received (> 0).
+            - ``cost_per_unit`` (float, required): Unit cost (>= 0).
+
+    Returns:
+        dict:
+            - Success: ``{"inventory_item": <dict>}`` (updated item as serialized
+              by the backend).
+            - Missing item_id: ``{"error": "Missing item_id"}``.
+            - Failure: ``{"error": <str|dict>, "status": <int|None>}`` when the
+              HTTP call fails or validation fails (e.g., 400).
+
+    Raises:
+        Any exception raised by ``request_json`` (e.g., network errors) will
+        propagate to the caller.
+
+    Example:
+        >>> await inventory_receive({"item_id": 12, "units": 50, "cost_per_unit": 42.5})
+        {'inventory_item': {'id': 12, 'name': 'Mineral Mix', 'quantity': 150, ...}}
     """
     item_id = data.pop("item_id", None)
     if item_id is None:
@@ -682,9 +788,33 @@ async def inventory_receive(data: dict) -> dict:
 
 @app.tool
 async def inventory_issue(data: dict) -> dict:
-    """
-    Issue inventory items and update the stock.
-    Expects key: item_id (int), units (int)
+    """Issue (egress) inventory units for an item and update stock.
+
+    Expects ``item_id`` in the input payload and posts the remaining fields to
+    ``{BASE_URL}/stores/inventory/issue/{item_id}/``. The backend decreases the
+    item's stock and records a movement entry.
+
+    Args:
+        data: JSON-serializable payload with:
+            - ``item_id`` (int, required): Primary key of the inventory item.
+              This key is popped from the payload and used in the URL path.
+            - ``units`` (int, required): Number of units to issue (> 0).
+
+    Returns:
+        dict:
+            - Success: ``{"inventory_item": <dict>}`` (updated item as serialized
+              by the backend).
+            - Missing item_id: ``{"error": "Missing item_id"}``.
+            - Failure: ``{"error": <str|dict>, "status": <int|None>}`` for HTTP or
+              validation errors (e.g., insufficient stock).
+
+    Raises:
+        Any exception raised by ``request_json`` (e.g., network errors) will
+        propagate to the caller.
+
+    Example:
+        >>> await inventory_issue({"item_id": 12, "units": 5})
+        {'inventory_item': {'id': 12, 'name': 'Mineral Mix', 'quantity': 95, ...}}
     """
     item_id = data.pop("item_id", None)
     if item_id is None:
@@ -700,10 +830,40 @@ async def inventory_issue(data: dict) -> dict:
 
 @app.tool
 async def get_inventory_movements() -> dict:
-    """Inventory **history** tool.
-    Use for movement **ledger / history / transactions / IN / OUT**.
-    Calls GET /stores/inventory/movements/ and returns {"inventory_movements":[...]}.
-    Do **not** use this for current stock or item listings.
+    """Fetch the inventory movement **ledger/history**.
+
+    Calls ``{BASE_URL}/stores/inventory/movements/`` and returns a normalized
+    payload of inventory **transactions** (IN/OUT). Use this to audit movement
+    history, not to fetch current stock levels or item listings.
+
+    Arguments:
+        None.
+
+    Returns:
+        dict:
+            - Success: ``{"inventory_movements": <list>}`` where each list item
+              is an ``InventoryMovement`` serialized by the backend.
+            - Failure: ``{"error": <str|dict>, "status": <int|None>}``.
+
+    Notes:
+        - This endpoint may support server-side filters such as ``direction``,
+          ``store_id``, ``item_id``, ``start``, and ``end`` (see view docstring
+          below). This tool calls the **unfiltered** list. If you need filters,
+          extend this tool to accept query parameters.
+        - Read-only and idempotent. Authentication/headers/timeouts are handled
+          by ``request_json``.
+
+    Raises:
+        Any exception raised by ``request_json`` (e.g., network errors) will
+        propagate to the caller.
+
+    Example:
+        >>> await get_inventory_movements()
+        {"inventory_movements": [
+            {"id": 301, "direction": "IN", "item": {...}, "units": 50, "occurred_at": "2025-09-01T10:15:00Z"},
+            {"id": 302, "direction": "OUT", "item": {...}, "units": 5,  "occurred_at": "2025-09-01T12:00:00Z"},
+            ...
+        ]}
     """
     result = await request_json("GET", f"{BASE_URL}/stores/inventory/movements/")
     if "error" in result:
@@ -717,8 +877,48 @@ async def filter_inventory_items(
     category_id: int | None = None,
     subcategory_id: int | None = None,
 ) -> dict:
-    """
-    Retrieve filtered inventory items by store/category/subcategory.
+
+    """Retrieve inventory items filtered by store, category, and subcategory.
+
+    Sends a GET request to ``{BASE_URL}/stores/inventory/filter/`` with query
+    parameters mapped as:
+      - ``store``     ← ``store_id`` (required by backend)
+      - ``category``  ← ``category_id`` (optional)
+      - ``sub``       ← ``subcategory_id`` (optional)
+
+    Although the function parameters are optional, the backend **requires**
+    ``store`` and will return ``400 {"error": "store param required"}`` if it is
+    missing.
+
+    Args:
+        store_id: Store primary key. **Required by backend.**
+        category_id: Product category primary key (optional).
+        subcategory_id: Product subcategory primary key (optional).
+
+    Returns:
+        dict:
+            - Success:
+              ``{"filtered_inventory": {"store": <str>, "items": <list>}}``,
+              where ``items`` is a list of serialized ``InventoryItem`` objects.
+            - Failure:
+              ``{"error": <str|dict>, "status": <int|None>}``.
+
+    Raises:
+        Any exception raised by ``request_json`` (e.g., network errors) will
+        propagate to the caller.
+
+    Examples:
+        >>> await filter_inventory_items(store_id=3)
+        {'filtered_inventory': {'store': 'Main Barn', 'items': [...]}}
+
+        >>> await filter_inventory_items(store_id=3, category_id=10)
+        {'filtered_inventory': {'store': 'Main Barn', 'items': [...]}}
+
+        >>> await filter_inventory_items(store_id=3, category_id=10, subcategory_id=2)
+        {'filtered_inventory': {'store': 'Main Barn', 'items': [...]}}
+
+        >>> await filter_inventory_items()  # missing store_id
+        {'error': {'error': 'store param required'}, 'status': 400}
     """
     params = {}
     if store_id is not None:
@@ -734,6 +934,9 @@ async def filter_inventory_items(
     if "error" in result:
         return {"error": result["error"], "status": result.get("status")}
     return {"filtered_inventory": result["data"]}
+
+
+
 
 
 async def _shutdown():

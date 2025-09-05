@@ -288,11 +288,11 @@ class InventoryFilterView(APIView):
 
 class get_store_by_name(APIView):
     permission_classes = [AllowAny]
-    def get(self, request, name):
-        """
-        GET /stores/store/name/<name>/
-        Returns store details for the given store name.
-        """
-        obj = get_object_or_404(Store, name=name)
-        return Response(StoreSerializer(obj).data)
 
+    def get(self, request):
+        name = request.GET.get("name")
+        if not name:
+            return Response({"error": "name query param required"}, status=400)
+
+        obj = get_object_or_404(Store, name__iexact=name)  # case-insensitive, optional
+        return Response(StoreSerializer(obj).data)
