@@ -8,10 +8,13 @@ from fastmcp.tools import tool
 from fastmcp import FastMCP
 import requests
 from typing import Dict, Any
+import httpx
 
 load_dotenv()
 BASE_URL = os.getenv("BASE_URL")
 API_TOKEN = os.getenv("API_TOKEN")  # optional: e.g., Bearer token or similar
+
+TIMEOUT = 10.0
 
 if not BASE_URL:
     raise RuntimeError("BASE_URL is not set in environment")
@@ -218,73 +221,46 @@ async def get_all_milk_entrys_in_time_period(start_date: str, end_date: str) -> 
 @app.tool()
 async def create_milk_entry(data: dict) -> dict:
     """
-    Create a new milk collection entry in the Django backend.
-
-    Sends a POST request to ``{BASE_URL}/cattle_hut/milk/`` with the JSON payload
-    required by ``MilkCollectionSerializer``. On success, returns the created
-    entry as serialized by the backend.
-
-    Args:
-        data (dict): JSON-serializable payload describing the entry to create.
-
-            Expected keys (serializer/model dependent):
-                - ``date`` (str, required): Collection date in ISO format ``YYYY-MM-DD``.
-                - ``local_sale_kg`` (float, optional; default 0.0): Quantity sold locally (kg).
-                - ``rise_kitchen_kg`` (float, optional; default 0.0): Quantity sent to Rise kitchen (kg).
-                - ``day_rate`` (float, optional; default 160.0): Per-kg rate for the day.
-
-            Notes:
-                * The model computes and persists:
-                  - ``total_kg = local_sale_kg + rise_kitchen_kg``
-                  - ``total_liters = total_kg * 1.027``
-                  - ``day_total_income = total_kg * day_rate``
-                * If any of the computed fields are passed, the backend may ignore/overwrite them.
-
-    Returns:
-        dict: One of the following shapes:
-
-            - Success:
-              ``{"milk_entry": <created_entry>}``
-              where ``<created_entry>`` is the newly created object including all fields,
-              typically:
-              ``id``, ``date``, ``local_sale_kg``, ``rise_kitchen_kg``,
-              ``total_kg``, ``total_liters``, ``day_rate``, ``day_total_income``.
-
-            - Error:
-              ``{"error": <str>, "status": <int | None>}`` when the HTTP call fails
-              or the backend returns a non-2xx status (e.g., validation errors).
-
-    Endpoint:
-        ``POST /cattle_hut/milk/`` (handled by ``MilkCollectionListCreateView.post``).
-
-    Examples:
-        >>> payload = {
-        ...     "date": "2025-08-21",
-        ...     "local_sale_kg": 12.5,
-        ...     "rise_kitchen_kg": 2.0,
-        ...     "day_rate": 160.0
-        ... }
-        >>> await create_milk_entry(payload)
-        {
-          "milk_entry": {
-            "id": 101,
-            "date": "2025-08-21",
-            "local_sale_kg": 12.5,
-            "rise_kitchen_kg": 2.0,
-            "total_kg": 14.5,
-            "total_liters": 14.8915,
-            "day_rate": 160.0,
-            "day_total_income": 2320.0
-          }
-        }
-
-        >>> await create_milk_entry({"date": "bad-date"})
-        {"error": {"date": ["Date has wrong format. Use one of these formats: YYYY-MM-DD."]}, "status": 400}
+    POST /cattle_hut/milk/ -> normalized response:
+      {"ok": True, "milk_entry": {...}} on success
+      {"ok": False, "status": <int>, "error": <str>, "detail": <any>} on failure
     """
-    result = await request_json("POST", f"{BASE_URL}/cattle_hut/milk/", json=data)
-    if "error" in result:
-        return {"error": result["error"], "status": result.get("status")}
-    return {"milk_entry": result["data"]}
+    url = f"{BASE_URL}/cattle_hut/milk/"
+    headers = {"Content-Type": "application/json"}
+
+    async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+        try:
+            resp = await client.post(url, json=data, headers=headers)
+        except httpx.RequestError as exc:
+            return {"ok": False, "status": 0, "error": f"request error: {exc}"}
+
+    # try parse JSON body (if any)
+    try:
+        body = resp.json()
+    except ValueError:
+        body = resp.text
+
+    # success status
+    if resp.status_code in (200, 201):
+        # try common shapes: {"ok":..}, {"milk_entry":..}, {"data": ..}, serializer data directly
+        if isinstance(body, dict):
+            if "milk_entry" in body:
+                entry = body["milk_entry"]
+            elif "data" in body and isinstance(body["data"], dict):
+                # data may wrap the object; try to find the entry
+                candidate = body["data"]
+                # e.g. candidate may be the serialized entry or contain it
+                entry = candidate.get("milk_entry") or candidate
+            else:
+                entry = body
+        else:
+            # non-json success
+            return {"ok": True, "milk_entry": None, "raw": body}
+
+        return {"ok": True, "milk_entry": entry}
+
+    # non-success status: return parsed error if possible
+    return {"ok": False, "status": resp.status_code, "error": getattr(body, "get", lambda k: body)("detail", str(body)), "detail": body}
 
 @app.tool()
 async def get_milk_entry_by_id(id: int) -> dict:
@@ -338,7 +314,7 @@ async def get_milk_entry_by_id(id: int) -> dict:
     return {"milk_entry": result["data"]}
 
 @app.tool()
-async def update_milk_entry(id: int, data: dict) -> dict:
+async def update_milk_entry(id: int, date: str, local_sale_kg: float, rise_kitchen_kg: float, day_rate: float) -> dict:
     """
     Update an existing milk collection entry by its identifier.
 
@@ -643,7 +619,7 @@ async def export_milk_collection_pdf(start_date: str, end_date: str) -> dict:
 async def get_latest_milk_collection() -> dict:
     """Fetch the most recent milk collection entry.
 
-    Sends a GET request to ``{BASE_URL}/milk/latest/`` and normalizes the
+    Sends a GET request to ``{BASE_URL}/cattle_hut/milk_collection/latest/`` and normalizes the
     response. If the backend returns 404, a friendlier error message is
     provided.
 
@@ -670,7 +646,7 @@ async def get_latest_milk_collection() -> dict:
             'day_total_income': 4880.0
         }}
     """
-    result = await request_json("GET", f"{BASE_URL}/milk/latest/")
+    result = await request_json("GET", f"{BASE_URL}/cattle_hut/milk_collection/latest/")
     if "error" in result:
         if result.get("status") == 404:
             return {"error": "No milk collection entry found", "status": 404}

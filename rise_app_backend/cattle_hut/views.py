@@ -43,9 +43,9 @@ class MilkCollectionListCreateView(APIView):
     def post(self, request):
         serializer = MilkCollectionSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            obj = serializer.save()
+            return Response({"ok": True, "milk_entry": serializer.data}, status=201)
+        return Response({"ok": False, "errors": serializer.errors}, status=400)
 
 # Retrieve, Update, Delete
 class MilkCollectionDetailView(APIView):

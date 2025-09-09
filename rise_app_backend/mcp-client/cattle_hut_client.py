@@ -66,7 +66,7 @@ Export milk collection PDF → export_milk_collection_pdf(start_date, end_date)
 If the tool returns a filename/path, report success and the filename.
 
 Latest milk collection → get_latest_milk_collection
-(GET /milk/latest/)
+(GET cattle_hut/milk_collection/latest/)
 
 Month-to-date income → get_month_to_date_income(date?)
 (GET /milk/month_to_date_income/ — optional date=YYYY-MM-DD)
@@ -138,7 +138,7 @@ Examples (routing)
 TOOLS = [{
     "type": "mcp",
     "server_label": "django-mcp-server",
-    "server_url": "https://7e65e5216722.ngrok-free.app/sse",
+    "server_url": "https://a5acb8ddfb05.ngrok-free.app/sse",
     "require_approval": "never",
 }]
 

@@ -5,6 +5,10 @@ import logging
 from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 from fastmcp.tools import tool
+from fastmcp import FastMCP
+import requests
+from typing import Dict, Any
+import httpx
 
 load_dotenv()
 BASE_URL = os.getenv("BASE_URL")
@@ -149,31 +153,33 @@ async def delete_location(location_id: int) -> dict:
     return {"location": result["data"]}
 
 @app.tool()
-async def get_subcategories(location_id: int) -> dict:
-    """Retrieve all subcategories .
+async def get_subcategories() -> dict:
+    """Retrieve all subcategories from the Django backend API.
 
     This tool sends a GET request to the Django endpoint
-    `/housekeeping/locations/sub/` and returns all
-    subcategories associated with the specified location.
+    `/housekeeping/sub/` and returns all available subcategories
+    as a dictionary.
     """
-    result = await request_json("GET", f"{BASE_URL}/housekeeping/locations/sub/")
+    result = await request_json("GET", f"{BASE_URL}/housekeeping/sub/")
     if "error" in result:
         return {"error": result["error"], "status": result.get("status")}
     return {"subcategories": result["data"]}
 
+
 @app.tool()
-async def create_subcategory(location_id: int, name: str, description: str = "") -> dict:
+async def create_subcategory(location: int, subcategory: str) -> dict:
     """Create a new subcategory for a specific location.
 
     This tool sends a POST request to the Django endpoint
     `/housekeeping/sub/` with the provided name and description.
     Returns the created subcategory details as a dictionary.
     """
-    data = {"name": name, "description": description, "location_id": location_id}
+    data = {"subcategory": subcategory, "location": location}
     result = await request_json("POST", f"{BASE_URL}/housekeeping/sub/", json=data)
     if "error" in result:
         return {"error": result["error"], "status": result.get("status")}
     return {"subcategory": result["data"]}
+
 
 @app.tool()
 async def get_subcategory_by_id(subcategory_id: int) -> dict:
@@ -189,14 +195,14 @@ async def get_subcategory_by_id(subcategory_id: int) -> dict:
     return {"subcategory": result["data"]}
 
 @app.tool()
-async def update_subcategory(subcategory_id: int, name: str, description: str = "") -> dict:
+async def update_subcategory(subcategory_id: int, subcategory: str) -> dict:
     """Update an existing subcategory in the Django backend API.
 
     This tool sends a PUT request to the Django endpoint
     `/housekeeping/sub/<subcategory_id>/` with the provided name and description.
     Returns the updated subcategory details as a dictionary.
     """
-    data = {"name": name, "description": description}
+    data = {"subcategory": subcategory}
     result = await request_json("PUT", f"{BASE_URL}/housekeeping/sub/{subcategory_id}/", json=data)
     if "error" in result:
         return {"error": result["error"], "status": result.get("status")}
@@ -314,3 +320,12 @@ async def get_subcategories_by_location(location_id: int) -> dict:
     if "error" in result:
         return {"error": result["error"], "status": result.get("status")}
     return {"subcategories": result["data"]}
+
+if __name__ == "__main__":
+    #try:
+    #    app.run(transport='sse')
+    #finally:
+        # best-effort cleanup; if event loop is still running, schedule close
+    #    asyncio.run(_shutdown())
+    print("Starting MCP SSE server on http://127.0.0.1:9000")
+    app.run(transport="sse", host="127.0.0.1", port=9000)
