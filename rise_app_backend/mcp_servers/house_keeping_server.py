@@ -222,7 +222,7 @@ async def delete_subcategory(subcategory_id: int) -> dict:
     return {"subcategory": result["data"]}
 
 @app.tool()
-async def create_new_tasks(location_id: int, subcategory_id: int, task_name: str, description: str = "") -> dict:
+async def create_new_tasks(subcategory: int, location: int, cleaning_type: str, ) -> dict:
     """Create a new task for a specific location and subcategory.
 
     This tool sends a POST request to the Django endpoint
@@ -230,10 +230,10 @@ async def create_new_tasks(location_id: int, subcategory_id: int, task_name: str
     Returns the created task details as a dictionary.
     """
     data = {
-        "location_id": location_id,
-        "subcategory_id": subcategory_id,
-        "task_name": task_name,
-        "description": description
+        "subcategory": subcategory,
+        "location": location,
+        "cleaning_type": cleaning_type
+        
     }
     result = await request_json("POST", f"{BASE_URL}/housekeeping/daily_task/", json=data)
     if "error" in result:

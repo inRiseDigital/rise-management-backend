@@ -1,4 +1,0 @@
-run mcp inspent -     npx @modelcontextprotocol/inspector python mcp_server.py
-
-                        mcp dev mcp_server.py
-

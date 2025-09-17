@@ -53,14 +53,16 @@ Subcategories
   (GET /housekeeping/sub/{id}/)
 - Create → create_subcategory(location, subcategory)
   (POST /housekeeping/sub/)
-- Update → update_subcategory(subcategory_id, name?, description?)
+- Update → update_subcategory(subcategory_id, subcategory, location)
   (PUT /housekeeping/sub/{id}/)
 - Delete → delete_subcategory(subcategory_id)
   (DELETE /housekeeping/sub/{id}/)
 
 Tasks (daily tasks)
-- Create task → create_new_tasks(location_id, subcategory_id, task_name, description="")
+- Create task → create_new_tasks(location_id, subcategory_id, cleaning_type)
   (POST /housekeeping/daily_task/)
+  
+  
 - Get tasks by location → get_tasks_by_location(location_id)
   (GET /housekeeping/task_by_location/{location_id}/)
 - Get tasks by period → get_tasks_by_period(start_date, end_date)
@@ -126,7 +128,7 @@ Always default to the simplest single tool call that satisfies the user request.
 TOOLS = [{
     "type": "mcp",
     "server_label": "django-mcp-server",
-    "server_url": "https://a5acb8ddfb05.ngrok-free.app/sse",
+    "server_url": "https://ced904a8e346.ngrok-free.app/sse",
     "require_approval": "never",
 }]
 

@@ -25,6 +25,6 @@ urlpatterns = [
     path('tasks/pdf-by-period/', TaskReportByPeriodPDFView.as_view(), name='task_pdf_by_period'),
     
     #subcategories-by-location
-    path('locations/subcategories/<int:location_id>',SubcategoriesByLocationView.as_view(),name='subcategories-by-location'),
+    path('locations/subcategories/<int:location_id>/',SubcategoriesByLocationView.as_view(),name='subcategories-by-location'),
    
 ]
