@@ -1,10 +1,15 @@
-import aiohttp
+# kitchen_MCP_server.py
 import asyncio
 import os
 import logging
 from dotenv import load_dotenv
-from mcp.server.fastmcp import FastMCP
-from fastmcp.tools import tool
+import aiohttp
+from fastmcp import FastMCP  # ensure fastmcp is installed
+# from fastmcp.tools import tool   # not needed if we use @app.tool
+import requests
+from typing import Dict, Any
+import httpx
+
 
 load_dotenv()
 BASE_URL = os.getenv("BASE_URL")
@@ -165,7 +170,7 @@ async def get_all_oil_extraction_deatails() -> dict:
     This tool sends a GET request to the Django endpoint
     `/oil/extraction/` and retrieves all oil extraction details.
     """
-    result = await request_json("GET", f"{BASE_URL}/oil/extraction/")
+    result = await request_json("GET", f"{BASE_URL}/oil/extractions/")
     if "error" in result:
         return {"error": result["error"], "status": result.get("status")}
     return {"extraction_details": result["data"]}
@@ -186,7 +191,7 @@ async def add_new_oil_extraction_detail(id: int, date: str,leaf_type:str, input_
         dict: The added oil extraction detail data or an error message.
     """
     data = {"machine_id": id, "date": date, "leaf_type": leaf_type, "input_weight": input_weight, "output_weight": output_weight, "price": price}
-    result = await request_json("POST", f"{BASE_URL}/oil/extraction/", json=data)
+    result = await request_json("POST", f"{BASE_URL}/oil/extractions/", json=data)
     if "error" in result:
         return {"error": result["error"], "status": result.get("status")}
     return {"extraction_detail": result["data"]}
@@ -201,7 +206,7 @@ async def Retrieve_oil_extraction_detail_by_id(id: int) -> dict:
     Returns:
         dict: The oil extraction detail data or an error message.
     """
-    result = await request_json("GET", f"{BASE_URL}/oil/extraction/{id}/")
+    result = await request_json("GET", f"{BASE_URL}/oil/extractions/{id}/")
     if "error" in result:
         return {"error": result["error"], "status": result.get("status")}
     return {"extraction_detail": result["data"]}
@@ -223,7 +228,7 @@ async def update_oil_extraction_detail(id: int, machine_id: int, date: str, leaf
         dict: The updated oil extraction detail data or an error message.
     """
     data = {"machine_id": machine_id, "date": date, "leaf_type": leaf_type, "input_weight": input_weight, "output_weight": output_weight, "price": price}
-    result = await request_json("PUT", f"{BASE_URL}/oil/extraction/{id}/", json=data)
+    result = await request_json("PUT", f"{BASE_URL}/oil/extractions/{id}/", json=data)
     if "error" in result:
         return {"error": result["error"], "status": result.get("status")}
     return {"extraction_detail": result["data"]}
@@ -238,7 +243,7 @@ async def delete_oil_extraction_detail(id: int) -> dict:
     Returns:
         dict: The deleted oil extraction detail data or an error message.
     """
-    result = await request_json("DELETE", f"{BASE_URL}/oil/extraction/{id}/")
+    result = await request_json("DELETE", f"{BASE_URL}/oil/extractions/{id}/")
     if "error" in result:
         return {"error": result["error"], "status": result.get("status")}
     return {"extraction_detail": result["data"]}
@@ -250,7 +255,7 @@ async def get_oil_perchased_details() -> dict:
     This tool sends a GET request to the Django endpoint
     `/oil/purchase/` and retrieves all oil purchased details.
     """
-    result = await request_json("GET", f"{BASE_URL}/oil/purchase/")
+    result = await request_json("GET", f"{BASE_URL}/oil/oil-purchases/")
     if "error" in result:
         return {"error": result["error"], "status": result.get("status")}
     return {"purchased_details": result["data"]}
@@ -269,7 +274,7 @@ async def add_new_oil_purchased_detail(date: str, oil_type:str, volume:float, re
         dict: The added oil purchased detail data or an error message.
     """
     data = {"date": date, "oil_type": oil_type, "volume": volume, "received_by": received_by, "location": location, "authorized_by": authorized_by, "remarks": remarks}
-    result = await request_json("POST", f"{BASE_URL}/oil/purchase/", json=data)
+    result = await request_json("POST", f"{BASE_URL}/oil/oil-purchases/", json=data)
     if "error" in result:
         return {"error": result["error"], "status": result.get("status")}
     return {"purchased_detail": result["data"]}
@@ -284,7 +289,7 @@ async def Retrieve_oil_purchased_detail_by_id(id: int) -> dict:
     Returns:
         dict: The oil purchased detail data or an error message.
     """
-    result = await request_json("GET", f"{BASE_URL}/oil/purchase/{id}/")
+    result = await request_json("GET", f"{BASE_URL}/oil/oil-purchases/{id}/")
     if "error" in result:
         return {"error": result["error"], "status": result.get("status")}
     return {"purchased_detail": result["data"]}
@@ -304,7 +309,7 @@ async def update_oil_purchased_detail(id: int, date: str, supplier_name:str, qua
         dict: The updated oil purchased detail data or an error message.
     """
     data = {"date": date, "supplier_name": supplier_name, "quantity": quantity, "price": price}
-    result = await request_json("PUT", f"{BASE_URL}/oil/purchase/{id}/", json=data)
+    result = await request_json("PUT", f"{BASE_URL}/oil/oil-purchases/{id}/", json=data)
     if "error" in result:
         return {"error": result["error"], "status": result.get("status")}
     return {"purchased_detail": result["data"]}
@@ -319,8 +324,17 @@ async def delete_oil_purchased_detail(id: int) -> dict:
     Returns:
         dict: The deleted oil purchased detail data or an error message.
     """
-    result = await request_json("DELETE", f"{BASE_URL}/oil/purchase/{id}/")
+    result = await request_json("DELETE", f"{BASE_URL}/oil/oil-purchases/{id}/")
     if "error" in result:
         return {"error": result["error"], "status": result.get("status")}
     return {"purchased_detail": result["data"]}
 
+
+if __name__ == "__main__":
+    #try:
+    #    app.run(transport='sse')
+    #finally:
+        # best-effort cleanup; if event loop is still running, schedule close
+    #    asyncio.run(_shutdown())
+    print("Starting MCP SSE server on http://127.0.0.1:9000")
+    app.run(transport="sse", host="127.0.0.1", port=9000)

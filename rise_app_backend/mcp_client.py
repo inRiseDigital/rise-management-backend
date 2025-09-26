@@ -1,6 +1,6 @@
 from openai import OpenAI
 
-client = OpenAI(api_key="")
+client = OpenAI(api_key="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")
 
 SYSTEM_FMT = """
 # Rise Tech Village Operations Agent
@@ -135,7 +135,7 @@ Remember: **EXACT TOOL ROUTING** is critical. Always match user intent to the co
 TOOLS = [{
     "type": "mcp",
     "server_label": "django-mcp-server",
-    "server_url": "https://e7b231ccfedc.ngrok-free.app/sse",
+    "server_url": "https://50881dcb7df2.ngrok-free.app/sse",
     "require_approval": "never",
 }]
 

@@ -462,7 +462,35 @@ async def get_expenses_by_category(category_id: int) -> dict:
 @app.tool()
 async def generate_kitchen_report(start_date: str, end_date: str) -> dict:
     url = f"{BASE_URL}/kitchen/report/?start_date={start_date}&end_date={end_date}"
-    return await _get_and_normalize(url)
+    try:
+        async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+            response = await client.get(url)
+            if response.status_code == 200:
+                filename = f"kitchen_report_{start_date}_to_{end_date}.pdf"
+                # Save to Downloads folder
+                import os
+                downloads_folder = os.path.join(os.path.expanduser("~"), "Downloads")
+                os.makedirs(downloads_folder, exist_ok=True)
+                file_path = os.path.join(downloads_folder, filename)
+                with open(file_path, 'wb') as f:
+                    f.write(response.content)
+                return {
+                    "success": True,
+                    "message": f"Kitchen report PDF generated successfully and saved to Downloads folder",
+                    "filename": filename,
+                    "file_path": file_path,
+                    "file_size": f"{len(response.content)} bytes"
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": f"Failed to download PDF. Status: {response.status_code}"
+                }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"Error downloading PDF: {str(e)}"
+        }
 
 
 @app.tool()
@@ -1269,7 +1297,7 @@ async def delete_store_by_id(store_id: int) -> dict:
 @app.tool
 async def add_product_category(name: str, store: int) -> dict:
     """
-    Create a new product category.
+    Create a new store product category.
 
     HTTP:
         POST /stores/categories/
@@ -1936,6 +1964,19 @@ async def filter_inventory_items(
         return {"error": result["error"], "status": result.get("status")}
     return {"filtered_inventory": result["data"]}
 
+@app.tool()
+async def get_all_locations() -> dict:
+    """Retrieve all house keeping location list of from the Django backend API.
+
+    This tool sends a GET request to the Django endpoint
+    `/housekeeping/location/` and returns all available house keeping locations
+    as a dictionary.
+    """
+    result = await request_json("GET", f"{BASE_URL}/housekeeping/location/")
+    if "error" in result:
+        return {"error": result["error"], "status": result.get("status")}
+    return {"stores": result["data"]}
+
 
 @app.tool()
 async def create_location(name: str, description: str = "") -> dict:
@@ -1993,7 +2034,7 @@ async def delete_location(location_id: int) -> dict:
 
 @app.tool()
 async def get_subcategories() -> dict:
-    """Retrieve all subcategories from the Django backend API.
+    """Retrieve all housekeeping subcategories from the Django backend API.
 
     This tool sends a GET request to the Django endpoint
     `/housekeeping/sub/` and returns all available subcategories
@@ -2007,7 +2048,7 @@ async def get_subcategories() -> dict:
 
 @app.tool()
 async def create_subcategory(location: int, subcategory: str) -> dict:
-    """Create a new subcategory for a specific location.
+    """Create a new housekeeping subcategory for a specific location.
 
     This tool sends a POST request to the Django endpoint
     `/housekeeping/sub/` with the provided name and description.
@@ -2022,7 +2063,7 @@ async def create_subcategory(location: int, subcategory: str) -> dict:
 
 @app.tool()
 async def get_subcategory_by_id(subcategory_id: int) -> dict:
-    """Retrieve a specific subcategory by its ID.
+    """Retrieve a specific housekeeping subcategory by its ID.
 
     This tool sends a GET request to the Django endpoint
     `/housekeeping/sub/<subcategory_id>/` and returns the details of the
@@ -2035,7 +2076,7 @@ async def get_subcategory_by_id(subcategory_id: int) -> dict:
 
 @app.tool()
 async def update_subcategory(subcategory_id: int, subcategory: str) -> dict:
-    """Update an existing subcategory in the Django backend API.
+    """Update an existing housekeeping subcategory in the Django backend API.
 
     This tool sends a PUT request to the Django endpoint
     `/housekeeping/sub/<subcategory_id>/` with the provided name and description.
@@ -2049,7 +2090,7 @@ async def update_subcategory(subcategory_id: int, subcategory: str) -> dict:
 
 @app.tool()
 async def delete_subcategory(subcategory_id: int) -> dict:
-    """Delete a subcategory from the Django backend API.
+    """Delete a housekeeping subcategory from the Django backend API.
 
     This tool sends a DELETE request to the Django endpoint
     `/housekeeping/sub/<subcategory_id>/` and returns the deleted subcategory
@@ -2062,7 +2103,7 @@ async def delete_subcategory(subcategory_id: int) -> dict:
 
 @app.tool()
 async def create_new_tasks(subcategory: int, location: int, cleaning_type: str, ) -> dict:
-    """Create a new task for a specific location and subcategory.
+    """Create a new task for a specific housekeeping location and subcategory.
 
     This tool sends a POST request to the Django endpoint
     `/housekeeping/daily_task/` with the provided task details.
@@ -2081,7 +2122,7 @@ async def create_new_tasks(subcategory: int, location: int, cleaning_type: str, 
 
 @app.tool()
 async def update_task(task_id: int, task_name: str, description: str = "") -> dict:
-    """Update an existing task in the Django backend API.
+    """Update an existing task in housekeeping the Django backend API.
 
     This tool sends a PUT request to the Django endpoint
     `/housekeeping/daily_task/<task_id>/` with the provided task details.
@@ -2095,7 +2136,7 @@ async def update_task(task_id: int, task_name: str, description: str = "") -> di
 
 @app.tool()
 async def delete_task(task_id: int) -> dict:
-    """Delete a task from the Django backend API.
+    """Delete a housekeeping task from the Django backend API.
 
     This tool sends a DELETE request to the Django endpoint
     `/housekeeping/daily_task/<task_id>/` and returns the deleted task
@@ -2108,7 +2149,7 @@ async def delete_task(task_id: int) -> dict:
 
 @app.tool()
 async def get_tasks_by_location(location_id: int) -> dict:
-    """Retrieve all tasks for a specific location.
+    """Retrieve housekeeping all tasks for a specific location.
 
     This tool sends a GET request to the Django endpoint
     `/housekeeping/task_by_location/<location_id>/` and returns all tasks
@@ -2121,7 +2162,7 @@ async def get_tasks_by_location(location_id: int) -> dict:
 
 @app.tool()
 async def get_tasks_by_period(start_date: str, end_date: str) -> dict:
-    """Retrieve tasks done in a selected time period.
+    """Retrieve housekeeping tasks done in a selected time period.
 
     This tool sends a GET request to the Django endpoint
     `/housekeeping/tasks/by-period/` with the specified start and end dates.
@@ -2149,7 +2190,7 @@ async def generate_task_report_pdf(start_date: str, end_date: str) -> dict:
 
 @app.tool()
 async def get_subcategories_by_location(location_id: int) -> dict:
-    """Retrieve all subcategories for a specific location.
+    """Retrieve housekeeping all subcategories for a specific location.
 
     This tool sends a GET request to the Django endpoint
     `/housekeeping/locations/subcategories/<location_id>/` and returns all
@@ -2159,6 +2200,352 @@ async def get_subcategories_by_location(location_id: int) -> dict:
     if "error" in result:
         return {"error": result["error"], "status": result.get("status")}
     return {"subcategories": result["data"]}
+
+#-- Oil extraction tools ---
+
+@app.tool()
+async def get_all_machines_deals() -> dict:
+    """Retrive All machines deals  from the Django backend API.
+
+    This tool sends a GET request to the Django endpoint
+    `/oil/machines/` and create new MEP project.
+    """
+    result = await request_json("GET", f"{BASE_URL}/oil/machines/")
+    if "error" in result:
+        return {"error": result["error"], "status": result.get("status")}
+    return {"stores": result["data"]}
+
+@app.tool()
+async def add_new_machine(name: str, description: str,) -> dict:
+    """Add a new machine to the Django backend API.
+
+    Args:
+        name (str): _description_
+        description (str): _description_
+
+    Returns:
+        dict: _description_
+    """
+    data = {"name": name, "description": description}
+    result = await request_json("POST", f"{BASE_URL}/oil/machines/", json=data)
+    if "error" in result:
+        return {"error": result["error"], "status": result.get("status")}
+    return {"machine": result["data"]}
+
+@app.tool()
+async def Retrieve_machine_by_id(machine_id: int) -> dict:
+    """Retrieve a machine by its ID from the Django backend API.
+
+    Args:
+        machine_id (int): The ID of the machine to retrieve.
+
+    Returns:
+        dict: The machine data or an error message.
+    """
+    result = await request_json("GET", f"{BASE_URL}/oil/machines/{machine_id}/")
+    if "error" in result:
+        return {"error": result["error"], "status": result.get("status")}
+    return {"machine": result["data"]}
+
+@app.tool()
+async def update_machine(machine_id: int, name: str, description: str) -> dict:
+    """Update an existing machine in the Django backend API.
+
+    Args:
+        machine_id (int): The ID of the machine to update.
+        name (str): The new name for the machine.
+        description (str): The new description for the machine.
+
+    Returns:
+        dict: The updated machine data or an error message.
+    """
+    data = {"name": name, "description": description}
+    result = await request_json("PUT", f"{BASE_URL}/oil/machines/{machine_id}/", json=data)
+    if "error" in result:
+        return {"error": result["error"], "status": result.get("status")}
+    return {"machine": result["data"]}
+
+@app.tool()
+async def delete_machine(machine_id: int) -> dict:
+    """Delete a machine from the Django backend API.
+
+    Args:
+        machine_id (int): The ID of the machine to delete.
+
+    Returns:
+        dict: The deleted machine data or an error message.
+    """
+    result = await request_json("DELETE", f"{BASE_URL}/oil/machines/{machine_id}/")
+    if "error" in result:
+        return {"error": result["error"], "status": result.get("status")}
+    return {"machine": result["data"]}
+
+@app.tool()
+async def get_all_oil_extraction_deatails() -> dict:
+    """Retrieve all oil extraction details from the Django backend API.
+
+    This tool sends a GET request to the Django endpoint
+    `/oil/extraction/` and retrieves all oil extraction details.
+    """
+    result = await request_json("GET", f"{BASE_URL}/oil/extractions/")
+    if "error" in result:
+        return {"error": result["error"], "status": result.get("status")}
+    return {"extraction_details": result["data"]}
+
+@app.tool()
+async def add_new_oil_extraction_detail(id: int, date: str,leaf_type:str, input_weight:float, output_weight:float, price:float) -> dict:
+    """Add a new oil extraction detail to the Django backend API.
+
+    Args:
+        machine_id (int): The ID of the machine associated with the oil extraction detail.
+        date (str): The date of the oil extraction detail.
+        leaf_type (str): The type of leaf used in the oil extraction detail.
+        input_weight (float): The input weight of the oil extraction detail.
+        output_weight (float): The output weight of the oil extraction detail.
+        price (float): The price of the oil extraction detail.
+
+    Returns:
+        dict: The added oil extraction detail data or an error message.
+    """
+    data = {"machine_id": id, "date": date, "leaf_type": leaf_type, "input_weight": input_weight, "output_weight": output_weight, "price": price}
+    result = await request_json("POST", f"{BASE_URL}/oil/extractions/", json=data)
+    if "error" in result:
+        return {"error": result["error"], "status": result.get("status")}
+    return {"extraction_detail": result["data"]}
+
+@app.tool()
+async def Retrieve_oil_extraction_detail_by_id(id: int) -> dict:
+    """Retrieve an oil extraction detail by its ID from the Django backend API.
+
+    Args:
+        detail_id (int): The ID of the oil extraction detail to retrieve.
+
+    Returns:
+        dict: The oil extraction detail data or an error message.
+    """
+    result = await request_json("GET", f"{BASE_URL}/oil/extractions/{id}/")
+    if "error" in result:
+        return {"error": result["error"], "status": result.get("status")}
+    return {"extraction_detail": result["data"]}
+
+@app.tool()
+async def update_oil_extraction_detail(id: int, machine_id: int, date: str, leaf_type:str, input_weight:float, output_weight:float, price:float) -> dict:
+    """Update an existing oil extraction detail in the Django backend API.
+
+    Args:
+        detail_id (int): The ID of the oil extraction detail to update.
+        machine_id (int): The ID of the machine associated with the oil extraction detail.
+        date (str): The date of the oil extraction detail.
+        leaf_type (str): The type of leaf used in the oil extraction detail.
+        input_weight (float): The input weight of the oil extraction detail.
+        output_weight (float): The output weight of the oil extraction detail.
+        price (float): The price of the oil extraction detail.
+
+    Returns:
+        dict: The updated oil extraction detail data or an error message.
+    """
+    data = {"machine_id": machine_id, "date": date, "leaf_type": leaf_type, "input_weight": input_weight, "output_weight": output_weight, "price": price}
+    result = await request_json("PUT", f"{BASE_URL}/oil/extractions/{id}/", json=data)
+    if "error" in result:
+        return {"error": result["error"], "status": result.get("status")}
+    return {"extraction_detail": result["data"]}
+
+@app.tool()
+async def delete_oil_extraction_detail(id: int) -> dict:
+    """Delete an oil extraction detail from the Django backend API.
+
+    Args:
+        detail_id (int): The ID of the oil extraction detail to delete.
+
+    Returns:
+        dict: The deleted oil extraction detail data or an error message.
+    """
+    result = await request_json("DELETE", f"{BASE_URL}/oil/extractions/{id}/")
+    if "error" in result:
+        return {"error": result["error"], "status": result.get("status")}
+    return {"extraction_detail": result["data"]}
+
+@app.tool()
+async def get_oil_perchased_details() -> dict:
+    """Retrieve all oil purchased details from the Django backend API.
+
+    This tool sends a GET request to the Django endpoint
+    `/oil/purchase/` and retrieves all oil purchased details.
+    """
+    result = await request_json("GET", f"{BASE_URL}/oil/oil-purchases/")
+    if "error" in result:
+        return {"error": result["error"], "status": result.get("status")}
+    return {"purchased_details": result["data"]}
+
+@app.tool()
+async def add_new_oil_purchased_detail(date: str, oil_type:str, volume:float, received_by:str,location:str,authorized_by:str,remarks:str) -> dict:
+    """Add a new oil purchased detail to the Django backend API.
+
+    Args:
+        date (str): The date of the oil purchased detail.
+        supplier_name (str): The name of the supplier for the oil purchased detail.
+        quantity (float): The quantity of oil purchased.
+        price (float): The price of the oil purchased detail.
+
+    Returns:
+        dict: The added oil purchased detail data or an error message.
+    """
+    data = {"date": date, "oil_type": oil_type, "volume": volume, "received_by": received_by, "location": location, "authorized_by": authorized_by, "remarks": remarks}
+    result = await request_json("POST", f"{BASE_URL}/oil/oil-purchases/", json=data)
+    if "error" in result:
+        return {"error": result["error"], "status": result.get("status")}
+    return {"purchased_detail": result["data"]}
+
+@app.tool()
+async def Retrieve_oil_purchased_detail_by_id(id: int) -> dict:
+    """Retrieve an oil purchased detail by its ID from the Django backend API.
+
+    Args:
+        detail_id (int): The ID of the oil purchased detail to retrieve.
+
+    Returns:
+        dict: The oil purchased detail data or an error message.
+    """
+    result = await request_json("GET", f"{BASE_URL}/oil/oil-purchases/{id}/")
+    if "error" in result:
+        return {"error": result["error"], "status": result.get("status")}
+    return {"purchased_detail": result["data"]}
+
+@app.tool()
+async def update_oil_purchased_detail(id: int, date: str, supplier_name:str, quantity:float, price:float) -> dict:
+    """Update an existing oil purchased detail in the Django backend API.
+
+    Args:
+        detail_id (int): The ID of the oil purchased detail to update.
+        date (str): The date of the oil purchased detail.
+        supplier_name (str): The name of the supplier for the oil purchased detail.
+        quantity (float): The quantity of oil purchased.
+        price (float): The price of the oil purchased detail.
+
+    Returns:
+        dict: The updated oil purchased detail data or an error message.
+    """
+    data = {"date": date, "supplier_name": supplier_name, "quantity": quantity, "price": price}
+    result = await request_json("PUT", f"{BASE_URL}/oil/oil-purchases/{id}/", json=data)
+    if "error" in result:
+        return {"error": result["error"], "status": result.get("status")}
+    return {"purchased_detail": result["data"]}
+
+
+@app.tool()
+async def get_inventory_report_details() -> dict:
+    """
+    Get comprehensive inventory details for report generation.
+
+    This tool fetches detailed inventory information from the stores app including:
+    - Summary statistics (total items, total value, low stock count, etc.)
+    - Items breakdown by store
+    - Items breakdown by category
+    - Low stock items (units < 10)
+    - High value items (top 10 by total cost)
+
+    The tool calls the Django endpoint `/stores/inventory/report-details/`
+    which provides aggregated inventory data useful for generating reports.
+
+    Returns:
+        dict: Comprehensive inventory report data containing:
+            - summary: Basic statistics
+            - stores_breakdown: Items count and value per store
+            - categories_breakdown: Items count and value per category
+            - low_stock_items: Items with less than 10 units
+            - high_value_items: Top 10 items by total cost
+
+    Example:
+        >>> await get_inventory_report_details()
+        {
+          "summary": {
+            "total_items": 45,
+            "total_inventory_value": 12500.75,
+            "low_stock_count": 8,
+            "stores_count": 3,
+            "categories_count": 5
+          },
+          "stores_breakdown": [
+            {"store_name": "Main Store", "item_count": 25, "total_value": 8000.50}
+          ],
+          "categories_breakdown": [
+            {"category_name": "Electronics", "item_count": 15, "total_value": 5000.25}
+          ],
+          "low_stock_items": [...],
+          "high_value_items": [...]
+        }
+    """
+    url = f"{BASE_URL}/stores/inventory/report-details/"
+    return await _get_and_normalize(url)
+
+
+@app.tool()
+async def generate_inventory_report_pdf() -> dict:
+    """
+    Generate a comprehensive PDF report of current inventory.
+
+    This tool generates a PDF document containing detailed inventory information including:
+    - Summary statistics (total items, total value, low stock count, etc.)
+    - Items breakdown by store with detailed tables
+    - Items breakdown by category
+    - Low stock items section (highlighted in red)
+    - Professional formatting with tables and proper pagination
+
+    The PDF is saved to the Downloads folder and includes:
+    - Professional header with report title and generation timestamp
+    - Summary section with key metrics
+    - Detailed inventory by store (up to 10 items per store shown)
+    - Low stock alerts section if applicable
+    - Proper table formatting with headers and styling
+
+    Returns:
+        dict: Success confirmation with filename and file path
+
+    Example:
+        >>> await generate_inventory_report_pdf()
+        {
+          "success": True,
+          "message": "Inventory report PDF generated successfully and saved to Downloads folder",
+          "filename": "inventory_report_20250926_140530.pdf",
+          "file_path": "/Users/username/Downloads/inventory_report_20250926_140530.pdf"
+        }
+    """
+    import os
+    url = f"{BASE_URL}/stores/inventory/report-pdf/"
+    try:
+        async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+            response = await client.get(url)
+            if response.status_code == 200:
+                from datetime import datetime
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                filename = f"inventory_report_{timestamp}.pdf"
+
+                # Save to Downloads folder
+                downloads_folder = os.path.join(os.path.expanduser("~"), "Downloads")
+                os.makedirs(downloads_folder, exist_ok=True)
+                file_path = os.path.join(downloads_folder, filename)
+
+                with open(file_path, 'wb') as f:
+                    f.write(response.content)
+
+                return {
+                    "success": True,
+                    "message": "Inventory report PDF generated successfully and saved to Downloads folder",
+                    "filename": filename,
+                    "file_path": file_path,
+                    "file_size": f"{len(response.content)} bytes"
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": f"Failed to generate PDF. Status: {response.status_code}"
+                }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"Error generating inventory PDF: {str(e)}"
+        }
+
 
 # --- small helpers to avoid repetition ---
 async def _get_and_normalize(url: str) -> dict:

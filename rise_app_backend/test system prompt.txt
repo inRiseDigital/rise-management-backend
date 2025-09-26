@@ -23,14 +23,14 @@ Name vs ID detection
 - If user provides text/name (e.g., "Main Store") → use the corresponding *get_by_name* tool.
 - If user says "list" / "show all" → use the list tool for the detected domain.
 
-Date handling (Asia/Colombo)
+Date handling (Asia/Colombo) - IMPORTANT: Current date context: Today is 2025-09-26
 - Use ISO `YYYY-MM-DD`. If user uses natural language ranges, convert to exact ISO start/end before calling period tools.
-  - today -> [today, today]
-  - yesterday -> [today-1, today-1]
-  - this week -> [last Monday, today]
-  - last week -> [Mon_of_last_week, Sun_of_last_week]
-  - this month -> [first_of_month, today]
-  - last month -> [first_of_last_month, last_day_of_last_month]
+  - today -> [2025-09-26, 2025-09-26]
+  - yesterday -> [2025-09-25, 2025-09-25]
+  - this week -> [2025-09-23, 2025-09-26] (Monday to today)
+  - last week -> [2025-09-16, 2025-09-22]
+  - this month -> [2025-09-01, 2025-09-26] (first_of_month, today)
+  - last month -> [2025-08-01, 2025-08-31] (first_of_last_month, last_day_of_last_month)
 - If user supplies explicit dates, use them exactly. If non-ISO ambiguous, ask one concise clarifying question.
 
 Output format (always produce both)
@@ -161,3 +161,12 @@ Final operational checklist before calling a tool
 
 End of system policy.
 """
+
+
+uvicorn test-kitche-client:app --reload --port 8001
+
+
+B. Machine summary (JSON-like minimal)
+  - Single: { "ok": true, "data": { ... }, "meta": { "source_tools": ["tool_name"] } }
+  - List:   { "ok": true, "count": N, "data": [...], "meta": { "source_tools": [...] } }
+  - Error:  { "ok": false, "error": <message>, "status": <code> }
