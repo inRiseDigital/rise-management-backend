@@ -9,7 +9,7 @@ from openai import OpenAI  # the new official client
 load_dotenv()
 
 
-client = OpenAI(api_key="")
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # Configure the MCP server address that your MCP service (FastMCP) is running on.
 # If you used the kitchen_MCP_server.py which runs on port 9000, try:

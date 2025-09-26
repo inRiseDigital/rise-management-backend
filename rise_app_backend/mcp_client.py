@@ -1,6 +1,6 @@
 from openai import OpenAI
 
-client = OpenAI(api_key="")
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 SYSTEM_FMT = """
 # Rise Tech Village Operations Agent
