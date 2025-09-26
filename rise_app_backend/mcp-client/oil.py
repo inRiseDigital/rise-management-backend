@@ -1,6 +1,10 @@
 from openai import OpenAI
+import os
+from dotenv import load_dotenv
 
-client = OpenAI(api_key="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")
+load_dotenv()
+
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 SYSTEM_FMT = """
 Role
