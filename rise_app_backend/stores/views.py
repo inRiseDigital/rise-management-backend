@@ -576,3 +576,84 @@ class InventoryReportPDFView(APIView):
                 {"error": f"Failed to generate inventory PDF report: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+# Store List Report PDF
+class StoreListReportView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        format_type = request.GET.get("format", "pdf")
+
+        try:
+            # Get all stores
+            stores = Store.objects.all().order_by('name')
+
+            # Return JSON if requested
+            if format_type == "json":
+                serializer = StoreSerializer(stores, many=True)
+                return Response({
+                    "total_stores": stores.count(),
+                    "stores": serializer.data
+                })
+
+            # Create PDF response
+            response = HttpResponse(content_type='application/pdf')
+            response['Content-Disposition'] = 'attachment; filename="stores_list_report.pdf"'
+
+            pdf = canvas.Canvas(response, pagesize=A4)
+            width, height = A4
+
+            # Header
+            pdf.setFont("Helvetica-Bold", 16)
+            pdf.drawCentredString(width/2, height - 2*cm, "STORES LIST REPORT")
+            pdf.setFont("Helvetica", 12)
+            pdf.drawRightString(width - 2*cm, height - 3*cm, f"Total Stores: {stores.count()}")
+
+            current_y = height - 4.5*cm
+
+            # Table data
+            data = [['Store Name', 'Created Date']]
+
+            for store in stores:
+                created_date = store.created_at.strftime("%Y-%m-%d") if store.created_at else 'N/A'
+                data.append([
+                    store.name[:40],
+                    created_date
+                ])
+
+            # Create table
+            col_widths = [12*cm, 5*cm]
+            table = Table(data, colWidths=col_widths, repeatRows=1)
+            table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 9),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+                ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 8),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ]))
+
+            # Draw table
+            table_height = len(data) * 0.6*cm
+            if current_y - table_height < 2*cm:
+                pdf.showPage()
+                current_y = height - 4*cm
+
+            table.wrapOn(pdf, width, height)
+            table.drawOn(pdf, 1.5*cm, current_y - table_height)
+
+            pdf.save()
+            return response
+
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to generate stores report: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

@@ -10,7 +10,7 @@ import requests
 from typing import Dict, Any
 import httpx
 
-load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(__file__), '../.env'))
 
 BASE_URL = os.getenv("BASE_URL")        # e.g. "http://127.0.0.1:8000"
 API_TOKEN = os.getenv("API_TOKEN")      # optional
@@ -460,9 +460,188 @@ async def get_expenses_by_category(category_id: int) -> dict:
 
 
 @app.tool()
+async def test_connection() -> dict:
+    """Simple test to verify MCP server connectivity."""
+    try:
+        import datetime
+        return {
+            "success": True,
+            "message": "MCP server is working correctly",
+            "timestamp": datetime.datetime.now().isoformat(),
+            "base_url": BASE_URL
+        }
+    except Exception as e:
+        return {"error": f"Test failed: {str(e)}"}
+
+
+@app.tool()
+async def generate_kitchen_report_json(start_date: str, end_date: str) -> dict:
+    """Generate a Kitchen Expenses report in JSON format for debugging.
+
+    Args:
+        start_date: Inclusive start date in YYYY-MM-DD format.
+        end_date: Inclusive end date in YYYY-MM-DD format.
+
+    Returns:
+        dict: Report data in JSON format
+    """
+    url = f"{BASE_URL}/kitchen/report/"
+    params = {"start_date": start_date, "end_date": end_date, "format": "json"}
+
+    session = await get_session()
+    try:
+        logger.info(f"Requesting kitchen report JSON from: {url} with params: {params}")
+
+        async with session.get(url, params=params) as resp:
+            logger.info(f"Response status: {resp.status}")
+
+            if resp.status != 200:
+                error_text = await resp.text()
+                return {"error": f"Failed to generate kitchen report. Status: {resp.status}. Response: {error_text}"}
+
+            payload = await resp.json()
+            logger.info(f"JSON response received: {type(payload)}")
+
+            return {
+                "success": True,
+                "data": payload,
+                "message": f"Kitchen expense report generated for {start_date} to {end_date}"
+            }
+
+    except Exception as e:
+        logger.error(f"JSON report error: {str(e)}", exc_info=True)
+        return {"error": f"JSON report error: {str(e)}"}
+
+
+@app.tool()
 async def generate_kitchen_report(start_date: str, end_date: str) -> dict:
-    url = f"{BASE_URL}/kitchen/report/?start_date={start_date}&end_date={end_date}"
-    return await _get_and_normalize(url)
+    """Generate and download a Kitchen Expenses PDF report for a date range.
+
+    Args:
+        start_date: Inclusive start date in YYYY-MM-DD format.
+        end_date: Inclusive end date in YYYY-MM-DD format.
+
+    Returns:
+        dict: PDF download information with base64 encoded PDF data
+    """
+    import base64
+
+    url = f"{BASE_URL}/kitchen/report/"
+    params = {"start_date": start_date, "end_date": end_date}  # No format param = PDF by default
+
+    session = await get_session()
+    try:
+        logger.info(f"Requesting kitchen report PDF from: {url} with params: {params}")
+
+        async with session.get(url, params=params) as resp:
+            logger.info(f"Response status: {resp.status}")
+            logger.info(f"Response headers: {dict(resp.headers)}")
+
+            if resp.status != 200:
+                error_text = await resp.text()
+                logger.error(f"Non-200 response: {error_text}")
+                return {"error": f"Failed to generate kitchen report PDF. Status code: {resp.status}. Response: {error_text}"}
+
+            # Check content type
+            content_type = resp.headers.get('Content-Type', '')
+            logger.info(f"Content-Type: {content_type}")
+
+            if 'application/pdf' not in content_type:
+                logger.warning(f"Expected PDF but got content type: {content_type}")
+                # Try to read as text to see what we actually got
+                try:
+                    text_content = await resp.text()
+                    logger.error(f"Non-PDF response content: {text_content[:500]}...")
+                    return {"error": f"Expected PDF but received {content_type}. Content: {text_content[:200]}..."}
+                except Exception as text_error:
+                    logger.error(f"Could not read response as text: {text_error}")
+                    return {"error": f"Expected PDF but received {content_type}. Could not read response."}
+
+            # Get the PDF binary content
+            try:
+                pdf_content = await resp.read()
+                logger.info(f"PDF content read successfully. Size: {len(pdf_content)} bytes")
+
+                # Verify it starts with PDF header
+                if not pdf_content.startswith(b'%PDF-'):
+                    logger.error(f"Content doesn't start with PDF header. First 50 bytes: {pdf_content[:50]}")
+                    return {"error": "Response doesn't appear to be a valid PDF file"}
+
+            except Exception as read_error:
+                logger.error(f"Error reading PDF content: {read_error}")
+                return {"error": f"Error reading PDF content: {str(read_error)}"}
+
+            # Convert to base64 for frontend
+            try:
+                pdf_base64 = base64.b64encode(pdf_content).decode('utf-8')
+                logger.info(f"PDF converted to base64. Base64 length: {len(pdf_base64)}")
+            except Exception as b64_error:
+                logger.error(f"Error encoding PDF to base64: {b64_error}")
+                return {"error": f"Error encoding PDF to base64: {str(b64_error)}"}
+
+            # Extract filename from header
+            content_disposition = resp.headers.get("Content-Disposition", "")
+            filename = f"kitchen_expense_report_{start_date}_to_{end_date}.pdf"
+            if "filename=" in content_disposition:
+                filename = content_disposition.split("filename=")[-1].strip('"')
+
+            logger.info(f"Generated kitchen PDF report: {filename}, size: {len(pdf_content)} bytes")
+
+            return {
+                "filename": filename,
+                "pdf_data": pdf_base64,
+                "message": f"Kitchen expense report PDF generated successfully",
+                "file_size": len(pdf_content)
+            }
+
+    except Exception as e:
+        logger.error(f"PDF generation error: {str(e)}", exc_info=True)
+        return {"error": f"PDF generation error: {str(e)}"}
+
+
+@app.tool()
+async def download_kitchen_report_pdf(start_date: str, end_date: str) -> dict:
+    """Download a Kitchen Expenses PDF report for a date range to Downloads folder.
+
+    Args:
+        start_date: Inclusive start date in YYYY-MM-DD format.
+        end_date: Inclusive end date in YYYY-MM-DD format.
+
+    Returns:
+        dict: Filename and file path of downloaded PDF
+    """
+    import os
+    from pathlib import Path
+
+    url = f"{BASE_URL}/kitchen/report/"
+    params = {"start_date": start_date, "end_date": end_date, "format": "pdf"}
+
+    session = await get_session()
+    try:
+        async with session.get(url, params=params) as resp:
+            if resp.status != 200:
+                return {"error": f"Failed to generate kitchen report PDF. Status code: {resp.status}"}
+
+            content_disposition = resp.headers.get("Content-Disposition", "")
+            filename = f"kitchen_expense_report_{start_date}_to_{end_date}.pdf"
+            if "filename=" in content_disposition:
+                filename = content_disposition.split("filename=")[-1].strip('"')
+
+            # Save to Downloads folder
+            downloads_path = Path.home() / "Downloads"
+            output_path = downloads_path / filename
+
+            with open(output_path, "wb") as f:
+                f.write(await resp.read())
+
+            return {
+                "filename": filename,
+                "file_path": str(output_path),
+                "message": f"Kitchen expense report PDF successfully downloaded to Downloads folder as {filename}"
+            }
+
+    except Exception as e:
+        return {"error": str(e)}
 
 
 @app.tool()
@@ -2265,21 +2444,38 @@ async def get_all_oil_extraction_deatails() -> dict:
     return {"extraction_details": result["data"]}
 
 @app.tool()
-async def add_new_oil_extraction_detail(id: int, date: str,leaf_type:str, input_weight:float, output_weight:float, price:float) -> dict:
+async def add_new_oil_extraction_detail(machine_id: int, date: str, leaf_type: str, input_weight: str, output_volume: str, on_time: str, on_by: str, off_time: str, off_by: str, run_duration: str, remarks: str = "") -> dict:
     """Add a new oil extraction detail to the Django backend API.
 
     Args:
         machine_id (int): The ID of the machine associated with the oil extraction detail.
-        date (str): The date of the oil extraction detail.
+        date (str): The date of the oil extraction detail in YYYY-MM-DD format.
         leaf_type (str): The type of leaf used in the oil extraction detail.
-        input_weight (float): The input weight of the oil extraction detail.
-        output_weight (float): The output weight of the oil extraction detail.
-        price (float): The price of the oil extraction detail.
+        input_weight (str): The input weight of the oil extraction detail as decimal string.
+        output_volume (str): The output volume of the oil extraction detail as decimal string.
+        on_time (str): The time when extraction started (HH:MM format).
+        on_by (str): Person who started the extraction.
+        off_time (str): The time when extraction ended (HH:MM format).
+        off_by (str): Person who ended the extraction.
+        run_duration (str): Duration of extraction (HH:MM:SS format).
+        remarks (str): Optional remarks about the extraction process.
 
     Returns:
         dict: The added oil extraction detail data or an error message.
     """
-    data = {"machine_id": id, "date": date, "leaf_type": leaf_type, "input_weight": input_weight, "output_weight": output_weight, "price": price}
+    data = {
+        "machine": machine_id,
+        "date": date,
+        "leaf_type": leaf_type,
+        "input_weight": input_weight,
+        "output_volume": output_volume,
+        "on_time": on_time,
+        "on_by": on_by,
+        "off_time": off_time,
+        "off_by": off_by,
+        "run_duration": run_duration,
+        "remarks": remarks
+    }
     result = await request_json("POST", f"{BASE_URL}/oil/extractions/", json=data)
     if "error" in result:
         return {"error": result["error"], "status": result.get("status")}
@@ -2301,22 +2497,76 @@ async def Retrieve_oil_extraction_detail_by_id(id: int) -> dict:
     return {"extraction_detail": result["data"]}
 
 @app.tool()
-async def update_oil_extraction_detail(id: int, machine_id: int, date: str, leaf_type:str, input_weight:float, output_weight:float, price:float) -> dict:
+async def update_oil_extraction_detail(
+    id: int,
+    machine_id: int = None,
+    date: str = None,
+    leaf_type: str = None,
+    input_weight: str = None,
+    output_volume: str = None,
+    on_time: str = None,
+    on_by: str = None,
+    off_time: str = None,
+    off_by: str = None,
+    run_duration: str = None,
+    remarks: str = None
+) -> dict:
     """Update an existing oil extraction detail in the Django backend API.
 
+    Only provide the fields you want to update. All parameters except 'id' are optional.
+
     Args:
-        detail_id (int): The ID of the oil extraction detail to update.
-        machine_id (int): The ID of the machine associated with the oil extraction detail.
-        date (str): The date of the oil extraction detail.
-        leaf_type (str): The type of leaf used in the oil extraction detail.
-        input_weight (float): The input weight of the oil extraction detail.
-        output_weight (float): The output weight of the oil extraction detail.
-        price (float): The price of the oil extraction detail.
+        id (int): The ID of the oil extraction detail to update (REQUIRED).
+        machine_id (int): Optional. The ID of the machine associated with the oil extraction detail.
+        date (str): Optional. The date of the oil extraction detail in YYYY-MM-DD format.
+        leaf_type (str): Optional. The type of leaf used in the oil extraction detail.
+        input_weight (str): Optional. The input weight of the oil extraction detail as decimal string.
+        output_volume (str): Optional. The output volume of the oil extraction detail as decimal string.
+        on_time (str): Optional. The time when extraction started (HH:MM format).
+        on_by (str): Optional. Person who started the extraction.
+        off_time (str): Optional. The time when extraction ended (HH:MM format).
+        off_by (str): Optional. Person who ended the extraction.
+        run_duration (str): Optional. Duration of extraction (HH:MM:SS format).
+        remarks (str): Optional. Remarks about the extraction process.
 
     Returns:
         dict: The updated oil extraction detail data or an error message.
+
+    Example:
+        # Update only the remarks field
+        await update_oil_extraction_detail(id=1, remarks="no issues")
+
+        # Update multiple fields
+        await update_oil_extraction_detail(id=1, leaf_type="Citronella", remarks="Good quality")
     """
-    data = {"machine_id": machine_id, "date": date, "leaf_type": leaf_type, "input_weight": input_weight, "output_weight": output_weight, "price": price}
+    # Build data dict with only provided fields
+    data = {}
+    if machine_id is not None:
+        data["machine"] = machine_id
+    if date is not None:
+        data["date"] = date
+    if leaf_type is not None:
+        data["leaf_type"] = leaf_type
+    if input_weight is not None:
+        data["input_weight"] = input_weight
+    if output_volume is not None:
+        data["output_volume"] = output_volume
+    if on_time is not None:
+        data["on_time"] = on_time
+    if on_by is not None:
+        data["on_by"] = on_by
+    if off_time is not None:
+        data["off_time"] = off_time
+    if off_by is not None:
+        data["off_by"] = off_by
+    if run_duration is not None:
+        data["run_duration"] = run_duration
+    if remarks is not None:
+        data["remarks"] = remarks
+
+    if not data:
+        return {"error": "No fields provided to update", "status": 400}
+
     result = await request_json("PUT", f"{BASE_URL}/oil/extractions/{id}/", json=data)
     if "error" in result:
         return {"error": result["error"], "status": result.get("status")}
@@ -2549,6 +2799,822 @@ async def _delete_and_normalize(url: str) -> dict:
     if "data" in resp:
         return {"data": resp["data"], "status": 200}
     return {"data": "deleted", "status": 204}
+
+
+@app.tool()
+async def generate_document_with_data(report_type: str, start_date: str = "", end_date: str = "", subtype: str = "records") -> dict:
+    """
+    Universal document/report generator that retrieves data first, then generates PDF.
+
+    This tool is designed to handle ANY type of report request. When a user asks
+    "generate report" or "create document", this tool:
+    1. Detects the report type and subtype
+    2. Retrieves the appropriate data using existing tools
+    3. Generates a PDF document with that data
+
+    Args:
+        report_type: Type of report to generate. Options:
+            - "kitchen" or "kitchen_expenses": Kitchen expense report
+            - "milk" or "cattle_hut": Milk collection report
+            - "housekeeping" or "tasks": Housekeeping tasks report
+            - "inventory" or "stores": Inventory report
+            - "oil" or "oil_extraction": Oil extraction report
+        start_date: Start date in YYYY-MM-DD format (e.g., "2025-09-01"). Optional for list-type reports.
+        end_date: End date in YYYY-MM-DD format (e.g., "2025-09-30"). Optional for list-type reports.
+        subtype: Subtype of report within the domain. Options:
+            - "records": Transaction/record data (expenses, extractions, etc.) - DEFAULT
+            - "list": List/inventory data (machines, items, categories)
+            - "summary": Aggregate/summary data (totals, statistics)
+
+    Returns:
+        dict: Contains retrieved data and PDF information:
+            - success: Boolean indicating success
+            - report_type: Type of report generated
+            - subtype: Subtype of report
+            - data: The retrieved data
+            - pdf_data: Base64-encoded PDF (if applicable)
+            - filename: PDF filename
+            - message: Success message with summary
+            - file_size: PDF size in bytes
+
+    Examples:
+        User: "Generate kitchen report for September"
+        >>> await generate_document_with_data("kitchen", "2025-09-01", "2025-09-30")
+
+        User: "Generate PDF of available oil extraction machines"
+        >>> await generate_document_with_data("oil", subtype="list")
+    """
+    try:
+        import base64
+
+        logger.info(f"Universal document generator called: type={report_type}, dates={start_date} to {end_date}")
+
+        report_type_lower = report_type.lower()
+
+        # Route to appropriate report generator based on type
+        if report_type_lower in ["kitchen", "kitchen_expenses", "kitchen_expense"]:
+            logger.info("Routing to kitchen expense report generator")
+
+            # Step 1: Retrieve kitchen expense data (call endpoint directly, not other tools)
+            logger.info("Step 1: Retrieving kitchen expense data...")
+
+            # Call the backend API directly instead of calling other tools
+            session = await get_session()
+            url = f"{BASE_URL}/kitchen/report/"
+            params = {"start_date": start_date, "end_date": end_date, "format": "json"}
+
+            async with session.get(url, params=params) as resp:
+                if resp.status != 200:
+                    error_text = await resp.text()
+                    return {
+                        "success": False,
+                        "report_type": "kitchen_expenses",
+                        "error": f"Failed to retrieve kitchen data: HTTP {resp.status}",
+                        "step": "data_retrieval"
+                    }
+                expense_data = await resp.json()
+
+            total_expenses = expense_data.get("total_expenses", 0)
+            expense_count = expense_data.get("expense_count", 0)
+
+            logger.info(f"Retrieved {expense_count} expenses, total: Rs. {total_expenses}")
+
+            # Step 2: Generate PDF (call endpoint directly)
+            logger.info("Step 2: Generating PDF document...")
+
+            # Call PDF endpoint directly
+            url_pdf = f"{BASE_URL}/kitchen/report/"
+            params_pdf = {"start_date": start_date, "end_date": end_date}  # No format param = PDF by default
+
+            async with session.get(url_pdf, params=params_pdf) as resp:
+                if resp.status != 200:
+                    error_text = await resp.text()
+                    return {
+                        "success": False,
+                        "report_type": "kitchen_expenses",
+                        "data": expense_data,
+                        "error": f"Data retrieved but PDF generation failed: HTTP {resp.status}",
+                        "step": "pdf_generation"
+                    }
+
+                # Check content type
+                content_type = resp.headers.get('Content-Type', '')
+                if 'application/pdf' not in content_type:
+                    return {
+                        "success": False,
+                        "report_type": "kitchen_expenses",
+                        "data": expense_data,
+                        "error": f"Expected PDF but received {content_type}",
+                        "step": "pdf_generation"
+                    }
+
+                # Get PDF content
+                pdf_content = await resp.read()
+
+                # Verify PDF header
+                if not pdf_content.startswith(b'%PDF-'):
+                    return {
+                        "success": False,
+                        "report_type": "kitchen_expenses",
+                        "data": expense_data,
+                        "error": "Response doesn't appear to be a valid PDF file",
+                        "step": "pdf_generation"
+                    }
+
+            # Convert to base64
+            pdf_base64 = base64.b64encode(pdf_content).decode('utf-8')
+            filename = f"kitchen_expense_report_{start_date}_to_{end_date}.pdf"
+
+            logger.info(f"Generated kitchen PDF report: {filename}, size: {len(pdf_content)} bytes")
+
+            return {
+                "success": True,
+                "report_type": "kitchen_expenses",
+                "data": expense_data,
+                "pdf_data": pdf_base64,
+                "filename": filename,
+                "message": f"Kitchen expense report generated successfully with {expense_count} expenses totaling Rs. {total_expenses:,.2f}",
+                "file_size": len(pdf_content),
+                "date_range": {"start": start_date, "end": end_date}
+            }
+
+        elif report_type_lower in ["milk", "cattle_hut", "milk_collection"]:
+            logger.info("Routing to milk collection report generator")
+
+            # Step 1: Retrieve milk collection data
+            logger.info("Step 1: Retrieving milk collection data...")
+            data_result = await get_all_milk_entries_in_time_period(start_date, end_date)
+
+            if "error" in data_result:
+                return {
+                    "success": False,
+                    "report_type": "milk_collection",
+                    "error": f"Failed to retrieve milk data: {data_result['error']}",
+                    "step": "data_retrieval"
+                }
+
+            milk_data = data_result.get("data", [])
+            entry_count = len(milk_data) if isinstance(milk_data, list) else 0
+
+            logger.info(f"Retrieved {entry_count} milk collection entries")
+
+            # Step 2: Generate PDF
+            logger.info("Step 2: Generating PDF document...")
+            pdf_result = await export_milk_collection_pdf(start_date, end_date)
+
+            if "error" in pdf_result:
+                return {
+                    "success": False,
+                    "report_type": "milk_collection",
+                    "data": milk_data,
+                    "error": f"Data retrieved but PDF generation failed: {pdf_result['error']}",
+                    "step": "pdf_generation"
+                }
+
+            return {
+                "success": True,
+                "report_type": "milk_collection",
+                "data": milk_data,
+                "filename": pdf_result.get("filename"),
+                "file_path": pdf_result.get("file_path"),
+                "message": f"Milk collection report generated successfully with {entry_count} entries",
+                "date_range": {"start": start_date, "end": end_date}
+            }
+
+        elif report_type_lower in ["housekeeping", "tasks", "housekeeping_tasks"]:
+            logger.info("Routing to housekeeping tasks report generator")
+
+            # Step 1: Retrieve housekeeping tasks data
+            logger.info("Step 1: Retrieving housekeeping tasks data...")
+            data_result = await get_tasks_by_period(start_date, end_date)
+
+            if "error" in data_result:
+                return {
+                    "success": False,
+                    "report_type": "housekeeping_tasks",
+                    "error": f"Failed to retrieve housekeeping data: {data_result['error']}",
+                    "step": "data_retrieval"
+                }
+
+            tasks_data = data_result.get("data", [])
+            task_count = len(tasks_data) if isinstance(tasks_data, list) else 0
+
+            logger.info(f"Retrieved {task_count} housekeeping tasks")
+
+            # Step 2: Generate PDF
+            logger.info("Step 2: Generating PDF document...")
+            pdf_result = await generate_task_report_pdf(start_date, end_date)
+
+            if "error" in pdf_result:
+                return {
+                    "success": False,
+                    "report_type": "housekeeping_tasks",
+                    "data": tasks_data,
+                    "error": f"Data retrieved but PDF generation failed: {pdf_result['error']}",
+                    "step": "pdf_generation"
+                }
+
+            return {
+                "success": True,
+                "report_type": "housekeeping_tasks",
+                "data": tasks_data,
+                "filename": pdf_result.get("filename"),
+                "file_path": pdf_result.get("file_path"),
+                "message": f"Housekeeping tasks report generated successfully with {task_count} tasks",
+                "date_range": {"start": start_date, "end": end_date}
+            }
+
+        elif report_type_lower in ["inventory", "stores", "inventory_report"]:
+            logger.info("Routing to inventory report generator")
+
+            # Step 1: Retrieve inventory data
+            logger.info("Step 1: Retrieving inventory data...")
+            data_result = await get_inventory_items()
+
+            if "error" in data_result:
+                return {
+                    "success": False,
+                    "report_type": "inventory",
+                    "error": f"Failed to retrieve inventory data: {data_result['error']}",
+                    "step": "data_retrieval"
+                }
+
+            inventory_data = data_result.get("data", [])
+            item_count = len(inventory_data) if isinstance(inventory_data, list) else 0
+
+            logger.info(f"Retrieved {item_count} inventory items")
+
+            # Step 2: Generate PDF
+            logger.info("Step 2: Generating PDF document...")
+            pdf_result = await generate_inventory_report_pdf()
+
+            if not pdf_result.get("success"):
+                return {
+                    "success": False,
+                    "report_type": "inventory",
+                    "data": inventory_data,
+                    "error": f"Data retrieved but PDF generation failed: {pdf_result.get('error')}",
+                    "step": "pdf_generation"
+                }
+
+            return {
+                "success": True,
+                "report_type": "inventory",
+                "data": inventory_data,
+                "filename": pdf_result.get("filename"),
+                "file_path": pdf_result.get("file_path"),
+                "message": f"Inventory report generated successfully with {item_count} items",
+                "file_size": pdf_result.get("file_size")
+            }
+
+        elif report_type_lower in ["oil", "oil_extraction", "oil_extraction_report"]:
+            logger.info(f"Routing to oil extraction report generator - subtype: {subtype}")
+
+            session = await get_session()
+
+            # Handle different subtypes
+            if subtype.lower() in ["list", "machines", "machine_list"]:
+                # Machine list report (no date range needed)
+                logger.info("Generating machine list report...")
+
+                # Step 1: Retrieve machine data
+                url = f"{BASE_URL}/oil/machines-report/"
+                params = {"format": "json"}
+
+                async with session.get(url, params=params) as resp:
+                    if resp.status != 200:
+                        error_text = await resp.text()
+                        return {
+                            "success": False,
+                            "report_type": "oil_extraction",
+                            "subtype": "machine_list",
+                            "error": f"Failed to retrieve machine list: HTTP {resp.status}",
+                            "step": "data_retrieval"
+                        }
+
+                    machine_data = await resp.json()
+                    machine_count = machine_data.get("total_machines", 0)
+
+                # Step 2: Generate PDF
+                url_pdf = f"{BASE_URL}/oil/machines-report/"
+                async with session.get(url_pdf) as resp:
+                    if resp.status != 200:
+                        return {
+                            "success": False,
+                            "report_type": "oil_extraction",
+                            "subtype": "machine_list",
+                            "data": machine_data,
+                            "error": f"Data retrieved but PDF generation failed: HTTP {resp.status}",
+                            "step": "pdf_generation"
+                        }
+
+                    pdf_content = await resp.read()
+
+                # Convert to base64 and return
+                pdf_base64 = base64.b64encode(pdf_content).decode('utf-8')
+                return {
+                    "success": True,
+                    "report_type": "oil_extraction",
+                    "subtype": "machine_list",
+                    "data": machine_data,
+                    "pdf_data": pdf_base64,
+                    "filename": "oil_extraction_machines_list.pdf",
+                    "message": f"Oil extraction machines report generated successfully with {machine_count} machines",
+                    "file_size": len(pdf_content)
+                }
+
+            else:
+                # Default: extraction records report (requires date range)
+                if not start_date or not end_date:
+                    return {
+                        "success": False,
+                        "report_type": "oil_extraction",
+                        "subtype": "records",
+                        "error": "start_date and end_date are required for extraction records report",
+                        "step": "validation"
+                    }
+
+                # Step 1: Retrieve oil extraction data (call endpoint directly)
+                logger.info("Step 1: Retrieving oil extraction records...")
+
+                url = f"{BASE_URL}/oil/report/"
+                params = {"start_date": start_date, "end_date": end_date, "format": "json"}
+
+                async with session.get(url, params=params) as resp:
+                    if resp.status != 200:
+                        error_text = await resp.text()
+                        return {
+                            "success": False,
+                            "report_type": "oil_extraction",
+                            "subtype": "records",
+                            "error": f"Failed to retrieve oil extraction data: HTTP {resp.status}",
+                            "step": "data_retrieval"
+                        }
+                    oil_data = await resp.json()
+
+                record_count = oil_data.get("total_records", 0)
+                total_input = oil_data.get("total_input_weight", 0)
+                total_output = oil_data.get("total_output_volume", 0)
+
+                logger.info(f"Retrieved {record_count} oil extraction records")
+
+                # Step 2: Generate PDF
+                logger.info("Step 2: Generating PDF document...")
+
+                url_pdf = f"{BASE_URL}/oil/report/"
+                params_pdf = {"start_date": start_date, "end_date": end_date}  # No format param = PDF by default
+
+                async with session.get(url_pdf, params=params_pdf) as resp:
+                    if resp.status != 200:
+                        error_text = await resp.text()
+                        return {
+                            "success": False,
+                            "report_type": "oil_extraction",
+                            "subtype": "records",
+                            "data": oil_data,
+                            "error": f"Data retrieved but PDF generation failed: HTTP {resp.status}",
+                            "step": "pdf_generation"
+                        }
+
+                    # Check content type
+                    content_type = resp.headers.get('Content-Type', '')
+                    if 'application/pdf' not in content_type:
+                        return {
+                            "success": False,
+                            "report_type": "oil_extraction",
+                            "subtype": "records",
+                            "data": oil_data,
+                            "error": f"Expected PDF but received {content_type}",
+                            "step": "pdf_generation"
+                        }
+
+                    # Get PDF content
+                    pdf_content = await resp.read()
+
+                # Verify PDF header
+                if not pdf_content.startswith(b'%PDF-'):
+                    return {
+                        "success": False,
+                        "report_type": "oil_extraction",
+                        "subtype": "records",
+                        "data": oil_data,
+                        "error": "Response doesn't appear to be a valid PDF file",
+                        "step": "pdf_generation"
+                    }
+
+                # Convert to base64
+                pdf_base64 = base64.b64encode(pdf_content).decode('utf-8')
+                filename = f"oil_extraction_report_{start_date}_to_{end_date}.pdf"
+
+                logger.info(f"Generated oil extraction PDF report: {filename}, size: {len(pdf_content)} bytes")
+
+                return {
+                    "success": True,
+                    "report_type": "oil_extraction",
+                    "subtype": "records",
+                    "data": oil_data,
+                    "pdf_data": pdf_base64,
+                    "filename": filename,
+                    "message": f"Oil extraction report generated successfully with {record_count} records. Input: {total_input:.2f} kg, Output: {total_output:.2f} L",
+                "file_size": len(pdf_content),
+                "date_range": {"start": start_date, "end": end_date}
+            }
+
+        else:
+            return {
+                "success": False,
+                "error": f"Unknown report type: {report_type}",
+                "supported_types": [
+                    "kitchen/kitchen_expenses",
+                    "milk/cattle_hut/milk_collection",
+                    "housekeeping/tasks",
+                    "inventory/stores",
+                    "oil/oil_extraction"
+                ]
+            }
+    except Exception as e:
+        logger.error(f"Error in generate_document_with_data: {str(e)}", exc_info=True)
+        return {
+            "success": False,
+            "error": f"Unexpected error generating document: {str(e)}",
+            "report_type": report_type if 'report_type' in locals() else "unknown"
+        }
+
+
+@app.tool()
+async def generate_pdf_from_data(title: str, data: list, description: str = "") -> dict:
+    """
+        Generate PDF from already-retrieved data.
+
+        This tool takes data you've already fetched using other tools (get_stores, get_machines, etc.)
+        and generates a PDF report.
+
+        WORKFLOW:
+        1. User asks: "generate report for stores"
+        2. You call: get_stores() to retrieve data
+        3. You call: generate_pdf_from_data(title="Store List", data=result_from_get_stores)
+        4. PDF is generated and returned!
+
+        Args:
+            title: Report title (e.g., "Store List Report", "Machine List")
+            data: The data to include in PDF - should be a list of dictionaries
+            description: Optional subtitle/description
+
+        Returns:
+            dict with success, pdf_data (base64), filename, message
+
+        Examples:
+            # After calling get_stores():
+            >>> stores_data = await get_stores()
+            >>> await generate_pdf_from_data("Store List Report", stores_data)
+
+            # After calling get_oil_extraction_machines():
+            >>> machines = await get_oil_extraction_machines()
+            >>> await generate_pdf_from_data("Oil Extraction Machines", machines)
+    """  
+    try:
+        import base64
+        import json
+        from datetime import datetime
+
+        logger.info(f"Generating PDF from data: title={title}, {len(data) if isinstance(data, list) else 0} items")
+
+        # Prepare the data for PDF generation
+        # Convert data to proper format if needed
+        if isinstance(data, str):
+            try:
+                data = json.loads(data)
+            except:
+                return {
+                    "success": False,
+                    "error": "Data must be a list or valid JSON string"
+                }
+
+        if not isinstance(data, list):
+            return {
+                "success": False,
+                "error": "Data must be a list of items"
+            }
+
+        if len(data) == 0:
+            return {
+                "success": False,
+                "error": "No data provided to generate PDF"
+            }
+
+        # Use the universal PDF generator utility
+        session = await get_session()
+
+        # We'll send the data to a special endpoint that generates PDF from provided data
+        url = f"{BASE_URL}/api/universal-report-from-data/"
+        payload = {
+            "title": title,
+            "data": data,
+            "description": description,
+            "metadata": {
+                "total_records": len(data),
+                "generated_at": datetime.now().isoformat()
+            }
+        }
+
+        logger.info(f"Calling PDF generation endpoint with {len(data)} records")
+
+        async with session.post(url, json=payload) as resp:
+            if resp.status != 200:
+                error_text = await resp.text()
+                logger.error(f"PDF generation failed: HTTP {resp.status}, {error_text}")
+                return {
+                    "success": False,
+                    "error": f"Failed to generate PDF: HTTP {resp.status}",
+                    "details": error_text
+                }
+
+            result = await resp.json()
+
+            if not result.get("success"):
+                return result
+
+            logger.info(f"PDF generated successfully: {result.get('filename')}, size: {result.get('file_size')} bytes")
+
+            return {
+                "success": True,
+                "pdf_data": result.get("pdf_data"),
+                "filename": result.get("filename"),
+                "file_size": result.get("file_size"),
+                "message": f"PDF report '{title}' generated successfully with {len(data)} records"
+            }
+
+    except Exception as e:
+        logger.error(f"Error in generate_pdf_from_data: {str(e)}", exc_info=True)
+        return {
+            "success": False,
+            "error": f"Unexpected error: {str(e)}"
+        }
+
+
+@app.tool()
+async def generate_universal_report(app_name: str, model_name: str, title: str = "", start_date: str = "", end_date: str = "") -> dict:
+    """
+    🌟 UNIVERSAL PDF REPORT GENERATOR 🌟
+
+    This is a completely generic tool that can generate PDF reports for ANY Django model
+    without needing hardcoded logic for each model type.
+
+    Use this tool when:
+    - User asks for a report about data you're not familiar with
+    - User requests reports for stores, machines, categories, or any other data
+    - You want to generate a PDF for ANY model in the system
+
+    Args:
+        app_name: Django app name (e.g., "oil_extraction", "stores", "kitchen", "cattle_hut")
+        model_name: Model name (e.g., "Machine", "Store", "KitchenExpense", "Category")
+        title: Custom report title (optional, auto-generated if not provided)
+        start_date: Filter by date >= start_date (optional, format: YYYY-MM-DD)
+        end_date: Filter by date <= end_date (optional, format: YYYY-MM-DD)
+
+    Returns:
+        dict: Contains PDF data and metadata:
+            - success: Boolean
+            - pdf_data: Base64-encoded PDF
+            - filename: PDF filename
+            - file_size: Size in bytes
+            - model: Model name
+            - app: App name
+
+    Examples:
+        User: "Generate PDF of oil extraction machines"
+        >>> await generate_universal_report("oil_extraction", "Machine", "Oil Extraction Machines")
+
+        User: "Show me store data as PDF"
+        >>> await generate_universal_report("stores", "Store")
+
+        User: "Generate kitchen expense report for September"
+        >>> await generate_universal_report("kitchen", "Expense", start_date="2025-09-01", end_date="2025-09-30")
+
+        User: "PDF of all product categories"
+        >>> await generate_universal_report("stores", "ProductCategory")
+
+    Model Name Mapping (common models):
+        - Oil Extraction:
+            * Machine → "Machine"
+            * Extraction records → "ExtractionRecord"
+            * Oil purchases → "OilPurchase"
+
+        - Stores/Inventory:
+            * Stores → "Store"
+            * Categories → "ProductCategory"
+            * Subcategories → "ProductSubcategory"
+            * Inventory items → "InventoryItem"
+
+        - Kitchen:
+            * Expenses → "Expense"
+            * Categories → "Category"
+
+        - Cattle Hut:
+            * Cattle → "Cattle"
+            * Milk collection → "MilkCollection"
+
+        - Housekeeping:
+            * Tasks → "Task"
+    """
+    try:
+        import base64
+
+        logger.info(f"Universal report generator called: app={app_name}, model={model_name}, dates={start_date} to {end_date}")
+
+        # Build URL with parameters
+        session = await get_session()
+        url = f"{BASE_URL}/api/universal-report-base64/"
+        params = {
+            "app": app_name,
+            "model": model_name,
+            "format": "pdf"
+        }
+
+        if title:
+            params["title"] = title
+
+        if start_date:
+            params["start_date"] = start_date
+
+        if end_date:
+            params["end_date"] = end_date
+
+        logger.info(f"Calling universal report endpoint: {url} with params: {params}")
+
+        async with session.get(url, params=params) as resp:
+            if resp.status != 200:
+                error_text = await resp.text()
+                logger.error(f"Universal report failed: HTTP {resp.status}, {error_text}")
+
+                # Try to parse error JSON
+                try:
+                    import json
+                    error_data = json.loads(error_text)
+                    return {
+                        "success": False,
+                        "error": error_data.get("error", f"HTTP {resp.status}"),
+                        "tip": error_data.get("tip", ""),
+                        "app": app_name,
+                        "model": model_name
+                    }
+                except:
+                    return {
+                        "success": False,
+                        "error": f"Failed to generate universal report: HTTP {resp.status}",
+                        "details": error_text,
+                        "app": app_name,
+                        "model": model_name
+                    }
+
+            result = await resp.json()
+
+            if not result.get("success"):
+                return result
+
+            logger.info(f"Universal report generated successfully: {result.get('filename')}, size: {result.get('file_size')} bytes")
+
+            return {
+                "success": True,
+                "pdf_data": result.get("pdf_data"),
+                "filename": result.get("filename"),
+                "file_size": result.get("file_size"),
+                "model": model_name,
+                "app": app_name,
+                "message": f"Universal report generated successfully for {model_name} ({app_name})"
+            }
+
+    except Exception as e:
+        logger.error(f"Error in generate_universal_report: {str(e)}", exc_info=True)
+        return {
+            "success": False,
+            "error": f"Unexpected error: {str(e)}",
+            "app": app_name,
+            "model": model_name
+        }
+
+
+#-- MEP Projects (for future multi-project support) --#
+
+@app.tool()
+async def project_create() -> dict:
+    """Create new project  from the Django backend API.
+
+    This tool sends a POST request to the Django endpoint
+    `/mep/MEP_projects/` and create new MEP project.
+    """
+    result = await request_json("POST", f"{BASE_URL}/mep/MEP_projects/")
+    if "error" in result:
+        return {"error": result["error"], "status": result.get("status")}
+    return {"stores": result["data"]}
+
+@app.tool()
+async def project_list() -> dict:
+    """List all MEP projects from the Django backend API.
+
+    This tool sends a GET request to the Django endpoint
+    `/mep/MEP_projects/` and retrieves all MEP projects.
+    """
+    result = await request_json("GET", f"{BASE_URL}/mep/MEP_projects/")
+    if "error" in result:
+        return {"error": result["error"], "status": result.get("status")}
+    return {"stores": result["data"]}
+
+@app.tool()
+async def project_delete(project_id: str) -> dict:
+    """Delete a MEP project by ID from the Django backend API.
+
+    This tool sends a DELETE request to the Django endpoint
+    `/mep/MEP_projects/<project_id>/` to delete the specified project.
+    """
+    result = await request_json("DELETE", f"{BASE_URL}/mep/MEP_projects/{project_id}/")
+    if "error" in result:
+        return {"error": result["error"], "status": result.get("status")}
+    return {"message": "Project deleted successfully"}  
+
+@app.tool()
+async def project_get(project_id: str) -> dict:
+    """Get a MEP project by ID from the Django backend API.
+
+    This tool sends a GET request to the Django endpoint
+    `/mep/MEP_projects/<project_id>/` to retrieve the specified project.
+    """
+    result = await request_json("GET", f"{BASE_URL}/mep/MEP_projects/{project_id}/")
+    if "error" in result:
+        return {"error": result["error"], "status": result.get("status")}
+    return {"project": result["data"]}
+
+@app.tool()
+async def project_update(project_id: int, data: dict) -> dict:
+    """Update a MEP project by ID from the Django backend API.
+
+    This tool sends a PUT request to the Django endpoint
+    `/mep/MEP_projects/<project_id>/` to update the specified project with new data.
+    """
+    result = await request_json("PUT", f"{BASE_URL}/mep/MEP_projects/{project_id}/", json=data)
+    if "error" in result:
+        return {"error": result["error"], "status": result.get("status")}
+    return {"project": result["data"]}
+
+@app.tool()
+async def create_new_task(project_id: int, task_data: dict) -> dict:
+    """Create a new task in a MEP project.
+
+    This tool sends a POST request to the Django endpoint
+    `/mep/MEP_projects/<project_id>/tasks/` to create a new task in the specified project.
+    """
+    result = await request_json("POST", f"{BASE_URL}/mep/MEP_projects/{project_id}/tasks/", json=task_data)
+    if "error" in result:
+        return {"error": result["error"], "status": result.get("status")}
+    return {"task": result["data"]}
+
+@app.tool()
+async def list_tasks(task_id: str) -> dict:
+    """List all tasks in a MEP project.
+
+    This tool sends a GET request to the Django endpoint
+    `/mep/MEP_projects/<project_id>/tasks/` to retrieve all tasks in the specified project.
+    """
+    result = await request_json("GET", f"{BASE_URL}/mep/MEP_projects/{task_id}/tasks/")
+    if "error" in result:
+        return {"error": result["error"], "status": result.get("status")}
+    return {"tasks": result["data"]}
+
+@app.tool()
+async def delete_task(id: int) -> dict:
+    """Delete a task by ID from a MEP project.
+
+    This tool sends a DELETE request to the Django endpoint
+    `/mep/MEP_projects/<project_id>/tasks/<task_id>/` to delete the specified task.
+    """
+    result = await request_json("DELETE", f"{BASE_URL}/mep/MEP_projects/{id}/tasks/")
+    if "error" in result:
+        return {"error": result["error"], "status": result.get("status")}
+    return {"message": "Task deleted successfully"}
+
+@app.tool()
+async def get_task(id: int) -> dict:
+    """Get a task by ID from a MEP project.
+
+    This tool sends a GET request to the Django endpoint
+    `/mep/MEP_projects/<project_id>/tasks/<task_id>/` to retrieve the specified task.
+    """
+    result = await request_json("GET", f"{BASE_URL}/mep/MEP_projects/{id}/tasks/")
+    if "error" in result:
+        return {"error": result["error"], "status": result.get("status")}
+    return {"task": result["data"]}
+
+@app.tool()
+async def get_ongoin_task(project_id: int) -> dict:
+    """Get all ongoing tasks from the MEP project.
+
+    This tool sends a GET request to the Django endpoint
+    `/mep/MEP_projects/<int:project_id>/tasks/ongoing/` to retrieve all ongoing tasks.
+    """
+    result = await request_json("GET", f"{BASE_URL}/mep/MEP_projects/{project_id}/tasks/ongoing/")
+    if "error" in result:
+        return {"error": result["error"], "status": result.get("status")}
+    return {"tasks": result["data"]}
 
 
 # --- cleanup helpers ---

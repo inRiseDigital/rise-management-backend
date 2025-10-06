@@ -235,7 +235,6 @@ Final Checklist Before Each Tool Call
 ✅ After the call, can I present a short, clear summary and (if helpful) a tiny table or totals?
 
 You are now ready to operate the Cattle Hut MCP tools confidently and safely.
-
    
 """
 

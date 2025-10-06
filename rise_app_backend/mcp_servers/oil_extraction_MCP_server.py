@@ -11,7 +11,7 @@ from typing import Dict, Any
 import httpx
 
 
-load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(__file__), '../.env'))
 BASE_URL = os.getenv("BASE_URL")
 API_TOKEN = os.getenv("API_TOKEN")  # optional: e.g., Bearer token or similar
 
@@ -176,21 +176,38 @@ async def get_all_oil_extraction_deatails() -> dict:
     return {"extraction_details": result["data"]}
 
 @app.tool()
-async def add_new_oil_extraction_detail(id: int, date: str,leaf_type:str, input_weight:float, output_weight:float, price:float) -> dict:
+async def add_new_oil_extraction_detail(machine_id: int, date: str, leaf_type: str, input_weight: str, output_volume: str, on_time: str, on_by: str, off_time: str, off_by: str, run_duration: str, remarks: str = "") -> dict:
     """Add a new oil extraction detail to the Django backend API.
 
     Args:
         machine_id (int): The ID of the machine associated with the oil extraction detail.
-        date (str): The date of the oil extraction detail.
+        date (str): The date of the oil extraction detail in YYYY-MM-DD format.
         leaf_type (str): The type of leaf used in the oil extraction detail.
-        input_weight (float): The input weight of the oil extraction detail.
-        output_weight (float): The output weight of the oil extraction detail.
-        price (float): The price of the oil extraction detail.
+        input_weight (str): The input weight of the oil extraction detail as decimal string.
+        output_volume (str): The output volume of the oil extraction detail as decimal string.
+        on_time (str): The time when extraction started (HH:MM format).
+        on_by (str): Person who started the extraction.
+        off_time (str): The time when extraction ended (HH:MM format).
+        off_by (str): Person who ended the extraction.
+        run_duration (str): Duration of extraction (HH:MM:SS format).
+        remarks (str): Optional remarks about the extraction process.
 
     Returns:
         dict: The added oil extraction detail data or an error message.
     """
-    data = {"machine_id": id, "date": date, "leaf_type": leaf_type, "input_weight": input_weight, "output_weight": output_weight, "price": price}
+    data = {
+        "machine": machine_id,
+        "date": date,
+        "leaf_type": leaf_type,
+        "input_weight": input_weight,
+        "output_volume": output_volume,
+        "on_time": on_time,
+        "on_by": on_by,
+        "off_time": off_time,
+        "off_by": off_by,
+        "run_duration": run_duration,
+        "remarks": remarks
+    }
     result = await request_json("POST", f"{BASE_URL}/oil/extractions/", json=data)
     if "error" in result:
         return {"error": result["error"], "status": result.get("status")}
@@ -212,22 +229,39 @@ async def Retrieve_oil_extraction_detail_by_id(id: int) -> dict:
     return {"extraction_detail": result["data"]}
 
 @app.tool()
-async def update_oil_extraction_detail(id: int, machine_id: int, date: str, leaf_type:str, input_weight:float, output_weight:float, price:float) -> dict:
+async def update_oil_extraction_detail(id: int, machine_id: int, date: str, leaf_type: str, input_weight: float, output_volume: float, on_time: str, on_by: str, off_time: str, off_by: str, run_duration: str, remarks: str = "") -> dict:
     """Update an existing oil extraction detail in the Django backend API.
 
     Args:
-        detail_id (int): The ID of the oil extraction detail to update.
+        id (int): The ID of the oil extraction detail to update.
         machine_id (int): The ID of the machine associated with the oil extraction detail.
-        date (str): The date of the oil extraction detail.
+        date (str): The date of the oil extraction detail in YYYY-MM-DD format.
         leaf_type (str): The type of leaf used in the oil extraction detail.
-        input_weight (float): The input weight of the oil extraction detail.
-        output_weight (float): The output weight of the oil extraction detail.
-        price (float): The price of the oil extraction detail.
+        input_weight (str): The input weight of the oil extraction detail as decimal string.
+        output_volume (str): The output volume of the oil extraction detail as decimal string.
+        on_time (str): The time when extraction started (HH:MM format).
+        on_by (str): Person who started the extraction.
+        off_time (str): The time when extraction ended (HH:MM format).
+        off_by (str): Person who ended the extraction.
+        run_duration (str): Duration of extraction (HH:MM:SS format).
+        remarks (str): Optional remarks about the extraction process.
 
     Returns:
         dict: The updated oil extraction detail data or an error message.
     """
-    data = {"machine_id": machine_id, "date": date, "leaf_type": leaf_type, "input_weight": input_weight, "output_weight": output_weight, "price": price}
+    data = {
+        "machine": machine_id,
+        "date": date,
+        "leaf_type": leaf_type,
+        "input_weight": input_weight,
+        "output_volume": output_volume,
+        "on_time": on_time,
+        "on_by": on_by,
+        "off_time": off_time,
+        "off_by": off_by,
+        "run_duration": run_duration,
+        "remarks": remarks
+    }
     result = await request_json("PUT", f"{BASE_URL}/oil/extractions/{id}/", json=data)
     if "error" in result:
         return {"error": result["error"], "status": result.get("status")}

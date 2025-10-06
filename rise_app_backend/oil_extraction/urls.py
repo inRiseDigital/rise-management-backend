@@ -2,7 +2,8 @@ from django.urls import path
 from .views import (
     MachineListCreate, MachineDetail,
     ExtractionRecordListCreate, ExtractionRecordDetail,
-    OilPurchaseListCreate, OilPurchaseDetail
+    OilPurchaseListCreate, OilPurchaseDetail,
+    OilExtractionReportView, MachineListReportView
 )
 
 urlpatterns = [
@@ -17,4 +18,8 @@ urlpatterns = [
     # OilPurchase endpoints
     path('oil-purchases/', OilPurchaseListCreate.as_view(), name='oilpurchase-list-create'),
     path('oil-purchases/<int:pk>/', OilPurchaseDetail.as_view(), name='oilpurchase-detail'),
+
+    # Report endpoints
+    path('report/', OilExtractionReportView.as_view(), name='oil-extraction-report'),
+    path('machines-report/', MachineListReportView.as_view(), name='machine-list-report'),
 ]

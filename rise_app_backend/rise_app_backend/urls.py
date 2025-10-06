@@ -30,4 +30,5 @@ urlpatterns = [
     path('labour_allocation/', include('labour_allocation.urls')),
     path('stores/', include('stores.urls')),
     path('oil/', include('oil_extraction.urls')),
+    path('api/', include('universal_reports.urls')),  # Universal report generator
 ]

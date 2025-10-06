@@ -6,7 +6,7 @@ from .views import (
   InventoryItemListCreate, InventoryItemDetail,
   InventoryReceive, InventoryIssue,
   InventoryFilterView,ProductSubCategoryByCategory, MovementListView,get_store_by_name,
-  InventoryReportDetails, InventoryReportPDFView
+  InventoryReportDetails, InventoryReportPDFView, StoreListReportView
 )
 
 urlpatterns = [
@@ -45,5 +45,8 @@ urlpatterns = [
 
     # Inventory PDF report
     path("inventory/report-pdf/", InventoryReportPDFView.as_view(), name="inventory-report-pdf"),
+
+    # Store list report
+    path("stores-report/", StoreListReportView.as_view(), name="store-list-report"),
 
 ]

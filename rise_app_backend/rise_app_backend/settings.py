@@ -45,11 +45,12 @@ INSTALLED_APPS = [
     'mep',
     'house_keeping',
     'kitchen',
-    'vehicle_bookig', 
+    'vehicle_bookig',
     'repair_expenses',
     'labour_allocation',
     'stores',
     'oil_extraction',
+    'universal_reports',  # Universal PDF report generator
 ]
 
 MIDDLEWARE = [
