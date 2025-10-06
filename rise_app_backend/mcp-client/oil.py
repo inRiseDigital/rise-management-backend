@@ -1,6 +1,6 @@
 from openai import OpenAI
 
-client = OpenAI(api_key="")
+client = OpenAI()
 
 SYSTEM_FMT = """
 Role
