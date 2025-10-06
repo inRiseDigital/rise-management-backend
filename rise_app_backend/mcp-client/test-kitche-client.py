@@ -25,7 +25,7 @@ TOOLS = [{
 
 # Very small system prompt — replace with your SYSTEM_FMT
 SYSTEM_FMT = """
-🚨🚨🚨 CRITICAL PDF GENERATION RULE - READ THIS FIRST! 🚨🚨🚨
+ CRITICAL PDF GENERATION RULE - READ THIS FIRST! 
 
 FOR ALL REPORT/PDF/DOCUMENT REQUESTS:
 STEP 1: Call appropriate GET tool (e.g., get_all_milk_entries(), get_all_milk_entrys_in_time_period(), etc.)

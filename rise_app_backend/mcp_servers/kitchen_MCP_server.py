@@ -3302,6 +3302,21 @@ async def generate_pdf_from_data(title: str, data: list, description: str = "") 
                 "error": "No data provided to generate PDF"
             }
 
+        # Remove unwanted fields from data before generating PDF
+        # These fields are typically not useful in PDFs (file paths, binary data, etc.)
+        fields_to_remove = ['image', 'created_at', 'updated_at']
+
+        cleaned_data = []
+        for item in data:
+            if isinstance(item, dict):
+                # Create a copy of the item without unwanted fields
+                cleaned_item = {k: v for k, v in item.items() if k not in fields_to_remove}
+                cleaned_data.append(cleaned_item)
+            else:
+                cleaned_data.append(item)
+
+        logger.info(f"Cleaned data: removed fields {fields_to_remove} from {len(data)} records")
+
         # Use the universal PDF generator utility
         session = await get_session()
 
@@ -3309,10 +3324,10 @@ async def generate_pdf_from_data(title: str, data: list, description: str = "") 
         url = f"{BASE_URL}/api/universal-report-from-data/"
         payload = {
             "title": title,
-            "data": data,
+            "data": cleaned_data,
             "description": description,
             "metadata": {
-                "total_records": len(data),
+                "total_records": len(cleaned_data),
                 "generated_at": datetime.now().isoformat()
             }
         }
