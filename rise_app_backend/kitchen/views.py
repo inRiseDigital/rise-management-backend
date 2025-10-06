@@ -124,6 +124,7 @@ class KitchenReportByPeriodPDFView(APIView):
     def get(self, request):
         start_date = request.GET.get("start_date")
         end_date = request.GET.get("end_date")
+        format_type = request.GET.get("format", "pdf")  # default to PDF
 
         if not start_date or not end_date:
             return Response({"error": "start_date and end_date required"}, status=400)
@@ -148,6 +149,35 @@ class KitchenReportByPeriodPDFView(APIView):
                 grouped[cat.id]['expenses'].append(expense)
                 grouped[cat.id]['total'] += expense.amount
                 total_expenses += expense.amount
+
+            # Return JSON if format=json
+            if format_type == "json":
+                # Convert expenses to serializable format
+                json_grouped = {}
+                for cat_id, cat_data in grouped.items():
+                    json_grouped[cat_id] = {
+                        'category_name': cat_data['category_name'],
+                        'total': cat_data['total'],
+                        'expenses': [
+                            {
+                                'id': expense.id,
+                                'date': expense.date.strftime("%Y-%m-%d"),
+                                'bill_no': expense.bill_no,
+                                'description': expense.description,
+                                'responsible_person': expense.responsible_person,
+                                'amount': float(expense.amount)
+                            }
+                            for expense in cat_data['expenses']
+                        ]
+                    }
+
+                return Response({
+                    "start_date": start_date,
+                    "end_date": end_date,
+                    "total_expenses": total_expenses,
+                    "categories": json_grouped,
+                    "expense_count": expenses.count()
+                })
 
             # Create PDF response
             response = HttpResponse(content_type='application/pdf')

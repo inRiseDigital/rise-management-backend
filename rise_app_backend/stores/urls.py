@@ -5,7 +5,8 @@ from .views import (
   ProductSubCategoryListCreate, ProductSubCategoryDetail,
   InventoryItemListCreate, InventoryItemDetail,
   InventoryReceive, InventoryIssue,
-  InventoryFilterView,ProductSubCategoryByCategory, MovementListView,get_store_by_name
+  InventoryFilterView,ProductSubCategoryByCategory, MovementListView,get_store_by_name,
+  InventoryReportDetails, InventoryReportPDFView
 )
 
 urlpatterns = [
@@ -38,8 +39,11 @@ urlpatterns = [
     path("inventory/movements/",        MovementListView.as_view(), name="inventory-movements"),
     
     path("by_name/", get_store_by_name.as_view(), name="get_store_by_name"),
-    
-    
-    
+
+    # Inventory report details
+    path("inventory/report-details/", InventoryReportDetails.as_view(), name="inventory-report-details"),
+
+    # Inventory PDF report
+    path("inventory/report-pdf/", InventoryReportPDFView.as_view(), name="inventory-report-pdf"),
 
 ]

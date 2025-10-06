@@ -1,4 +1,7 @@
 from openai import OpenAI
+import os
+from dotenv import load_dotenv
+
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -135,7 +138,7 @@ Remember: **EXACT TOOL ROUTING** is critical. Always match user intent to the co
 TOOLS = [{
     "type": "mcp",
     "server_label": "django-mcp-server",
-    "server_url": "https://e7b231ccfedc.ngrok-free.app/sse",
+    "server_url": "https://50881dcb7df2.ngrok-free.app/sse",
     "require_approval": "never",
 }]
 
