@@ -462,35 +462,7 @@ async def get_expenses_by_category(category_id: int) -> dict:
 @app.tool()
 async def generate_kitchen_report(start_date: str, end_date: str) -> dict:
     url = f"{BASE_URL}/kitchen/report/?start_date={start_date}&end_date={end_date}"
-    try:
-        async with httpx.AsyncClient(timeout=TIMEOUT) as client:
-            response = await client.get(url)
-            if response.status_code == 200:
-                filename = f"kitchen_report_{start_date}_to_{end_date}.pdf"
-                # Save to Downloads folder
-                import os
-                downloads_folder = os.path.join(os.path.expanduser("~"), "Downloads")
-                os.makedirs(downloads_folder, exist_ok=True)
-                file_path = os.path.join(downloads_folder, filename)
-                with open(file_path, 'wb') as f:
-                    f.write(response.content)
-                return {
-                    "success": True,
-                    "message": f"Kitchen report PDF generated successfully and saved to Downloads folder",
-                    "filename": filename,
-                    "file_path": file_path,
-                    "file_size": f"{len(response.content)} bytes"
-                }
-            else:
-                return {
-                    "success": False,
-                    "error": f"Failed to download PDF. Status: {response.status_code}"
-                }
-    except Exception as e:
-        return {
-            "success": False,
-            "error": f"Error downloading PDF: {str(e)}"
-        }
+    return await _get_and_normalize(url)
 
 
 @app.tool()
