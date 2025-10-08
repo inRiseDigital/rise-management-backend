@@ -3512,13 +3512,14 @@ async def generate_universal_report(app_name: str, model_name: str, title: str =
 #-- MEP Projects (for future multi-project support) --#
 
 @app.tool()
-async def project_create() -> dict:
+async def project_create(name: str, description: str,) -> dict:
     """Create new project  from the Django backend API.
 
     This tool sends a POST request to the Django endpoint
     `/mep/MEP_projects/` and create new MEP project.
     """
-    result = await request_json("POST", f"{BASE_URL}/mep/MEP_projects/")
+    data = {"name": name, "description": description}
+    result = await request_json("POST", f"{BASE_URL}/mep/MEP_projects/" , json=data)
     if "error" in result:
         return {"error": result["error"], "status": result.get("status")}
     return {"stores": result["data"]}
@@ -3536,37 +3537,40 @@ async def project_list() -> dict:
     return {"stores": result["data"]}
 
 @app.tool()
-async def project_delete(project_id: str) -> dict:
+async def project_delete(id: int) -> dict:
     """Delete a MEP project by ID from the Django backend API.
 
     This tool sends a DELETE request to the Django endpoint
     `/mep/MEP_projects/<project_id>/` to delete the specified project.
+    
     """
-    result = await request_json("DELETE", f"{BASE_URL}/mep/MEP_projects/{project_id}/")
+    
+    result = await request_json("DELETE", f"{BASE_URL}/mep/MEP_projects/{id}/")
     if "error" in result:
         return {"error": result["error"], "status": result.get("status")}
     return {"message": "Project deleted successfully"}  
 
 @app.tool()
-async def project_get(project_id: str) -> dict:
+async def project_get(id: int) -> dict:
     """Get a MEP project by ID from the Django backend API.
 
     This tool sends a GET request to the Django endpoint
-    `/mep/MEP_projects/<project_id>/` to retrieve the specified project.
+    `/mep/MEP_projects/<id>/` to retrieve the specified project.
     """
-    result = await request_json("GET", f"{BASE_URL}/mep/MEP_projects/{project_id}/")
+
+    result = await request_json("GET", f"{BASE_URL}/mep/MEP_projects/{id}/")
     if "error" in result:
         return {"error": result["error"], "status": result.get("status")}
     return {"project": result["data"]}
 
 @app.tool()
-async def project_update(project_id: int, data: dict) -> dict:
+async def project_update(id: int, data: dict) -> dict:
     """Update a MEP project by ID from the Django backend API.
 
     This tool sends a PUT request to the Django endpoint
-    `/mep/MEP_projects/<project_id>/` to update the specified project with new data.
+    `/mep/MEP_projects/<id>/` to update the specified project with new data.
     """
-    result = await request_json("PUT", f"{BASE_URL}/mep/MEP_projects/{project_id}/", json=data)
+    result = await request_json("PUT", f"{BASE_URL}/mep/MEP_projects/{id}/", json=data)
     if "error" in result:
         return {"error": result["error"], "status": result.get("status")}
     return {"project": result["data"]}
@@ -3630,6 +3634,41 @@ async def get_ongoin_task(project_id: int) -> dict:
     if "error" in result:
         return {"error": result["error"], "status": result.get("status")}
     return {"tasks": result["data"]}
+
+@app.tool()
+async def get_tasks_by_project_name(project_name: str) -> dict:
+    """Get all tasks for a MEP project by its name.
+
+    This tool sends a GET request to the Django endpoint
+    `/mep/MEP_tasks/by-project-name/?project_name=<name>` to retrieve all tasks
+    for the specified project by name.
+
+    Args:
+        project_name (str): The name of the MEP project (e.g., "Rise Project")
+
+    Returns:
+        dict: A dictionary containing:
+            - project_id: The ID of the project
+            - project_name: The name of the project
+            - project_description: Description of the project
+            - tasks: List of all tasks for the project
+            - task_count: Total number of tasks
+        Or an error dict if project not found or request fails
+
+    Example:
+        >>> await get_tasks_by_project_name("Rise Project")
+        {
+            "project_id": 1,
+            "project_name": "Rise Project",
+            "project_description": "Kandy",
+            "tasks": [...],
+            "task_count": 5
+        }
+    """
+    result = await request_json("GET", f"{BASE_URL}/mep/MEP_tasks/by-project-name/?project_name={project_name}")
+    if "error" in result:
+        return {"error": result["error"], "status": result.get("status")}
+    return result["data"]
 
 
 # --- cleanup helpers ---

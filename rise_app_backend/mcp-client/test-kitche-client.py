@@ -9,17 +9,17 @@ from openai import OpenAI  # the new official client
 load_dotenv()
 
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = OpenAI(api_key="")
 
 # Configure the MCP server address that your MCP service (FastMCP) is running on.
 # If you used the kitchen_MCP_server.py which runs on port 9000, try:
-MCP_SSE_URL = os.getenv("MCP_SSE_URL", "https://d677ece2d831.ngrok-free.app/sse")
+MCP_SSE_URL = os.getenv("MCP_SSE_URL", "https://10c39f1b9a22.ngrok-free.app/sse")
 
 # Tools config for OpenAI responses (point to your MCP SSE endpoint)
 TOOLS = [{
     "type": "mcp",
     "server_label": "django-mcp-server",
-    "server_url": "https://d677ece2d831.ngrok-free.app/sse",
+    "server_url": "https://10c39f1b9a22.ngrok-free.app/sse",
     "require_approval": "never"
 }]
 
@@ -343,14 +343,14 @@ Special note for receive/issue:
 
 6) MEP Project Management
 - project_list() -> GET /mep/MEP_projects/                     (List all MEP projects)
-- project_create() -> POST /mep/MEP_projects/                  (Create new MEP project)
-    * Can be called with no parameters (creates empty project) OR with optional data
-    * Optional data fields: {"name": "...", "description": "..."}
-    * When user asks "what data do you need to create project?", respond: "To create an MEP project, I can accept: name (optional, must be unique), description (optional). You can create an empty project and update it later, or provide these fields now."
-- project_get(project_id) -> GET /mep/MEP_projects/{project_id}/
-- project_update(project_id, data) -> PUT /mep/MEP_projects/{project_id}/
+- project_create() -> POST /mep/MEP_projects/                  (Add/Create new MEP project)
+    * Can't be called with no parameters  (creates empty project) OR with optional data
+    * required data fields: {"name": "..."}
+    * When user asks "what data do you need to create project?", respond: "To create an MEP project, I can accept: name (must be unique), description (optional). You can create an empty project and update it later, or provide these fields now."
+- project_get(pk) -> GET /mep/MEP_projects/{pk}/
+- project_update(pk, data) -> PUT /mep/MEP_projects/{pk}/
     * Available fields to update: {"name": "...", "description": "..."}
-- project_delete(project_id) -> DELETE /mep/MEP_projects/{project_id}/
+- project_delete(pk) -> DELETE /mep/MEP_projects/{pk}/
 
 MEP Task Management
 - create_new_task(project_id, task_data) -> POST /mep/MEP_projects/{project_id}/tasks/
@@ -358,19 +358,22 @@ MEP Task Management
     * Optional fields: status (default: "ongoing"), unskills (int, default: 0), semi_skills (int, default: 0), skills (int, default: 0)
     * When user asks "what data do you need to create task?", list required fields first, then optional fields
     * Example task_data: {"description": "Install pipes", "location": "Building A", "qty": "50", "date": "2025-10-10", "status": "ongoing", "unskills": 2, "semi_skills": 3, "skills": 1}
-- list_tasks(project_id) -> GET /mep/MEP_projects/{project_id}/tasks/
+- list_tasks(project_id) -> GET /mep/MEP_projects/{pk}/tasks/
 - get_task(task_id) -> GET /mep/MEP_projects/{task_id}/tasks/
-- get_ongoin_task(project_id) -> GET /mep/MEP_projects/{project_id}/tasks/ongoing/
+- get_ongoin_task(project_id) -> GET /mep/MEP_projects/{pk}/tasks/ongoing/
+- get_tasks_by_project_name(project_name) -> GET /mep/MEP_tasks/by-project-name/?project_name={name}
+    * Retrieves ALL tasks for a project by its name (not ID)
+    * Returns: project_id, project_name, project_description, tasks (list), task_count
+    * Example: get_tasks_by_project_name("Rise Project")
 - delete_task(task_id) -> DELETE /mep/MEP_projects/{task_id}/tasks/
 
 MEP Project Name vs ID Routing (CRITICAL):
 - If user provides project ID number (e.g., "project 1", "id 1") -> use project_get(project_id) directly
-- If user provides project name (e.g., "Rise Project", "details of Rise Project"):
-  1. Check conversation history for the project ID (e.g., if you just listed "Rise Project (ID: 1)", use 1)
-  2. If ID is in recent context, use project_get(id) with that ID
-  3. If no context, DO NOT say "not found" - instead call project_list() first to get all projects and find the matching ID
-- For task operations, always use project_id (integer), never project name
-- Common mistake: User asks about ongoing projects, you return "Rise Project (ID: 1)", then user asks "details of Rise Project" -> YOU MUST use ID 1 from context!
+- If user provides project name (e.g., "Rise Project", "tasks for Rise Project"):
+  1. For PROJECT details: Check conversation history for the project ID, or call project_list() to find ID, then use project_get(id)
+  2. For TASKS by project name: Use get_tasks_by_project_name(project_name) directly - NO NEED to get ID first!
+- For task operations with project_id, always use project_id (integer)
+- Common mistake: User asks "get tasks for Rise Project" -> You should call get_tasks_by_project_name("Rise Project") NOT project_get!
 
 Final checklist before calling a tool
 1. Determine the single correct tool using the routing rules above.

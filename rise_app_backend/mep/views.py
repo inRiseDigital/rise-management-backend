@@ -13,6 +13,9 @@ from reportlab.platypus import Table, TableStyle
 from django.utils.dateparse import parse_date
 from django.http import HttpResponse
 from textwrap import wrap
+import logging
+
+logger = logging.getLogger(__name__)
 
 # --- Project Views ---
 class ProjectListCreateView(APIView):
@@ -31,24 +34,24 @@ class ProjectListCreateView(APIView):
 
 class ProjectDetailView(APIView):
     permission_classes = [AllowAny] 
-    def get_object(self, pk):
-        return get_object_or_404(Project, pk=pk)
+    def get_object(self, id):
+        return get_object_or_404(Project, id=id)
 
-    def get(self, request, pk):
-        project = self.get_object(pk)
+    def get(self, request, id):
+        project = self.get_object(id)
         serializer = ProjectSerializer(project)
         return Response(serializer.data)
 
-    def put(self, request, pk):
-        project = self.get_object(pk)
+    def put(self, request, id):
+        project = self.get_object(id)
         serializer = ProjectSerializer(project, data=request.data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    def delete(self, request, pk):
-        project = self.get_object(pk)
+    def delete(self, request, id):
+        project = self.get_object(id)
         project.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -130,12 +133,55 @@ class TaskDetailView(APIView):
 '''
 #retrieve onging tasks for a project
 class OngoingTasksView(APIView):
-    permission_classes = [AllowAny] 
+    permission_classes = [AllowAny]
     def get(self, request, project_id):
         tasks = Task.objects.filter(project_id=project_id, status='ongoing')
         serializer = TaskSerializer(tasks, many=True)
         return Response(serializer.data)
-    
+
+#retrieve tasks by project name
+class TasksByProjectNameView(APIView):
+    permission_classes = [AllowAny]
+    def get(self, request):
+        project_name = request.GET.get('project_name')
+
+        logger.info(f"🔍 TasksByProjectNameView called with project_name: {project_name}")
+        print(f"🔍 TasksByProjectNameView called with project_name: {project_name}")
+
+        if not project_name:
+            logger.warning("❌ Missing project_name parameter")
+            print("❌ Missing project_name parameter")
+            return Response({"error": "project_name parameter is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # Find project by name (case-insensitive)
+            project = Project.objects.get(name__iexact=project_name)
+            logger.info(f"✅ Found project: ID={project.id}, Name={project.name}")
+            print(f"✅ Found project: ID={project.id}, Name={project.name}")
+
+            # Get all tasks for this project
+            tasks = Task.objects.filter(project=project)
+            task_count = tasks.count()
+            logger.info(f"✅ Found {task_count} tasks for project '{project.name}'")
+            print(f"✅ Found {task_count} tasks for project '{project.name}'")
+
+            serializer = TaskSerializer(tasks, many=True)
+
+            return Response({
+                "project_id": project.id,
+                "project_name": project.name,
+                "project_description": project.description,
+                "tasks": serializer.data,
+                "task_count": task_count
+            })
+        except Project.DoesNotExist:
+            logger.error(f"❌ Project with name '{project_name}' not found")
+            print(f"❌ Project with name '{project_name}' not found")
+            return Response(
+                {"error": f"Project with name '{project_name}' not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
 
 class MepReportPDFExportView(APIView):
     permission_classes = [AllowAny]
